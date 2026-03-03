@@ -34,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          <div className="flex-1 max-w-md mx-8">
+          <div className="flex-1 max-w-md mx-4 sm:mx-8 hidden sm:block">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -45,20 +45,20 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <button
               onClick={onJoinGroup}
-              className="border border-blue-600 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+              className="border border-blue-600 text-blue-600 hover:bg-blue-50 px-2 sm:px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
             >
               <LogIn className="w-4 h-4" />
-              <span>Join Group</span>
+              <span className="hidden sm:inline">Join Group</span>
             </button>
             <button
               onClick={onCreateGroup}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-2 sm:px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
             >
               <Plus className="w-4 h-4" />
-              <span>New Group</span>
+              <span className="hidden sm:inline">New Group</span>
             </button>
 
             <button className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors">

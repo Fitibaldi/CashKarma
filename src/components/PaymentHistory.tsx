@@ -1,5 +1,5 @@
-import React from 'react';
-import { CreditCard, Clock, CheckCircle, Banknote, Building, Smartphone, DollarSign, Edit } from 'lucide-react';
+import React, { useState } from 'react';
+import { CreditCard, Clock, CheckCircle, Banknote, Building, Smartphone, DollarSign, Edit, ChevronDown, ChevronUp } from 'lucide-react';
 import { Payment } from '../types/group';
 
 interface PaymentHistoryProps {
@@ -38,49 +38,65 @@ const getPaymentMethodColor = (method: string) => {
   }
 };
 
-export const PaymentHistory: React.FC<PaymentHistoryProps> = ({ 
-  payments, 
+export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
+  payments,
   onEditPayment,
-  currentUserId 
+  currentUserId
 }) => {
+  const [isOpen, setIsOpen] = useState(true);
+
   if (payments.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment History</h2>
-        <div className="text-center py-8">
-          <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No payments yet</h3>
-          <p className="text-gray-500">Payment history will appear here once members start settling up</p>
-        </div>
+        <button
+          onClick={() => setIsOpen(o => !o)}
+          className="w-full flex items-center justify-between text-left"
+        >
+          <h2 className="text-lg font-semibold text-gray-900">Payment History</h2>
+          {isOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+        </button>
+        {isOpen && (
+          <div className="text-center py-8 mt-4">
+            <CreditCard className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No payments yet</h3>
+            <p className="text-gray-500">Payment history will appear here once members start settling up</p>
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">
-        Payment History ({payments.length})
-      </h2>
-      <div className="space-y-4">
+      <button
+        onClick={() => setIsOpen(o => !o)}
+        className="w-full flex items-center justify-between text-left"
+      >
+        <h2 className="text-lg font-semibold text-gray-900">
+          Payment History ({payments.length})
+        </h2>
+        {isOpen ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+      </button>
+      {isOpen && <div className="space-y-4 mt-4">
         {payments.map((payment) => (
-          <div key={payment.id} className="flex items-center justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+          <div key={payment.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors gap-3">
+            <div className="flex items-start space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
                 {payment.fromUserName.split(' ').map(n => n.charAt(0)).join('')}
               </div>
-              <div>
-                <p className="font-medium text-gray-900">
+              <div className="min-w-0">
+                <p className="font-medium text-gray-900 flex flex-wrap gap-x-1">
                   <span className="text-blue-600">{payment.fromUserName}</span>
-                  <span className="text-gray-500 mx-2">paid for</span>
+                  <span className="text-gray-500">paid for</span>
                   <span className="text-green-600">
-                    {payment.splitType === 'equal' 
-                      ? 'everyone' 
+                    {payment.splitType === 'equal'
+                      ? 'everyone'
                       : `${payment.selectedMembers.length} member${payment.selectedMembers.length > 1 ? 's' : ''}`
                     }
                   </span>
                 </p>
-                <p className="text-sm text-gray-500">{payment.description}</p>
-                <div className="flex items-center space-x-2 mt-1">
+                <p className="text-sm text-gray-500 truncate">{payment.description}</p>
+                <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mt-1">
                   <span className={`inline-flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${getPaymentMethodColor(payment.method)}`}>
                     {getPaymentMethodIcon(payment.method)}
                     <span className="capitalize">{payment.method}</span>
@@ -91,8 +107,8 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
+            <div className="flex items-center justify-between sm:justify-end space-x-4 flex-shrink-0">
+              <div className="sm:text-right">
                 <p className="text-lg font-bold text-gray-900">
                   {payment.currency}{payment.amount.toFixed(2)}
                 </p>
@@ -110,7 +126,7 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
                   )}
                 </div>
               </div>
-              
+
               {onEditPayment && currentUserId && (currentUserId === payment.fromUserId || currentUserId === payment.toUserId) && (
                 <button
                   onClick={() => onEditPayment(payment)}
@@ -123,7 +139,7 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
             </div>
           </div>
         ))}
-      </div>
+      </div>}
     </div>
   );
 };
