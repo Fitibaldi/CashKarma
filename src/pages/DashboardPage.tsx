@@ -46,19 +46,31 @@ export const DashboardPage: React.FC = () => {
 
   const handleCreateGroupSubmit = async (groupData: GroupFormData) => {
     if (!user) return;
-    const groupId = await saveGroup(
-      {
-        name: groupData.name,
-        description: groupData.description,
-        location: groupData.location,
-        currency: '€',
-        avatarUrl: groupData.avatarUrl,
-      },
-      user.id
-    );
-    await createGroupDetails({ id: groupId, name: groupData.name, description: groupData.description, location: groupData.location, currency: '€', avatarUrl: groupData.avatarUrl, memberCount: 1, totalExpenses: 0, lastActivity: 'Just now', yourBalance: 0 }, user);
-    await generateInviteCode(groupId);
-    await loadData(user.id);
+    try {
+      console.log('Creating group:', groupData.name, '| user.id:', user.id);
+      const groupId = await saveGroup(
+        {
+          name: groupData.name,
+          description: groupData.description,
+          location: groupData.location,
+          currency: '€',
+        },
+        user.id
+      );
+      console.log('Group created with ID:', groupId);
+
+      await createGroupDetails({ id: groupId, name: groupData.name, description: groupData.description, location: groupData.location, currency: '€', memberCount: 1, totalExpenses: 0, lastActivity: 'Just now', yourBalance: 0 }, user);
+      console.log('Group details created');
+
+      await generateInviteCode(groupId);
+      console.log('Invite code generated');
+
+      await loadData(user.id);
+      console.log('Groups reloaded');
+    } catch (error) {
+      console.error('Error creating group:', error);
+      throw error;
+    }
   };
 
   const handleAcceptInvitation = async (invitationId: string) => {

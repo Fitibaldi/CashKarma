@@ -74,6 +74,8 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
         fromUserName: `${fromUser?.firstName} ${fromUser?.lastName}`,
         splitType: formData.splitType,
         selectedMembers: formData.selectedMembers,
+        splitBetween: formData.selectedMembers,
+        paidBy: formData.fromUserId,
         amount: parseFloat(formData.amount),
         currency,
         description: formData.description.trim(),

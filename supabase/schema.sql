@@ -212,7 +212,7 @@ create policy "profiles: update own"
 create policy "groups: members can read"
   on public.groups for select
   to authenticated
-  using (public.is_group_member(id));
+  using (created_by = auth.uid() or public.is_group_member(id));
 
 create policy "groups: authenticated can create"
   on public.groups for insert
@@ -243,6 +243,12 @@ create policy "group_members: self join or creator"
       where g.id = group_id and g.created_by = auth.uid()
     )
   );
+
+create policy "group_members: self can update own"
+  on public.group_members for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
 
 -- ============================================================
 -- RLS POLICIES: payments

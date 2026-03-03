@@ -28,7 +28,7 @@ export type Database = {
           avatar_url?: string | null
           updated_at?: string
         }
-        Relationships: readonly []
+        Relationships: []
       }
       groups: {
         Row: {
@@ -61,7 +61,15 @@ export type Database = {
           currency?: string
           updated_at?: string
         }
-        Relationships: readonly []
+        Relationships: [
+          {
+            foreignKeyName: "groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       group_members: {
         Row: {
@@ -81,7 +89,22 @@ export type Database = {
         Update: {
           role?: 'admin' | 'member'
         }
-        Relationships: readonly []
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       payments: {
         Row: {
@@ -134,7 +157,36 @@ export type Database = {
           paid_by?: string
           updated_at?: string
         }
-        Relationships: readonly []
+        Relationships: [
+          {
+            foreignKeyName: "payments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_from_user_id_fkey"
+            columns: ["from_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_to_user_id_fkey"
+            columns: ["to_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_paid_by_fkey"
+            columns: ["paid_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       settlements: {
         Row: {
@@ -154,7 +206,29 @@ export type Database = {
           created_at?: string
         }
         Update: Record<string, never>
-        Relationships: readonly []
+        Relationships: [
+          {
+            foreignKeyName: "settlements_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlements_from_user_id_fkey"
+            columns: ["from_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlements_to_user_id_fkey"
+            columns: ["to_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       group_invitations: {
         Row: {
@@ -179,7 +253,29 @@ export type Database = {
           status?: 'pending' | 'accepted' | 'declined'
           accepted_at?: string | null
         }
-        Relationships: readonly []
+        Relationships: [
+          {
+            foreignKeyName: "group_invitations_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_invitations_invited_user_id_fkey"
+            columns: ["invited_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       invite_codes: {
         Row: {
@@ -195,7 +291,15 @@ export type Database = {
           created_at?: string
         }
         Update: Record<string, never>
-        Relationships: readonly []
+        Relationships: [
+          {
+            foreignKeyName: "invite_codes_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: true
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: Record<string, never>

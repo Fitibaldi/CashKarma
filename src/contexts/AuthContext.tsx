@@ -3,6 +3,8 @@ import { User, LoginCredentials, RegisterCredentials, AuthContextType } from '..
 import { authenticateUser, registerUser, updateUserProfile, signOut } from '../utils/auth'
 import { supabase } from '../lib/supabase'
 
+type ProfileRow = { id: string; email: string; first_name: string; last_name: string; created_at: string; avatar_url: string | null }
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export const useAuth = () => {
@@ -31,21 +33,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
 
         if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
-          if (profile) {
-            setUser({
-              id: profile.id,
-              email: profile.email,
-              firstName: profile.first_name,
-              lastName: profile.last_name,
-              createdAt: profile.created_at,
-              avatarUrl: profile.avatar_url ?? undefined,
-            })
+          try {
+            const result = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single()
+            const profile = result.data as ProfileRow | null
+            if (profile) {
+              setUser({
+                id: profile.id,
+                email: profile.email,
+                firstName: profile.first_name,
+                lastName: profile.last_name,
+                createdAt: profile.created_at,
+                avatarUrl: profile.avatar_url ?? undefined,
+              })
+            }
+          } finally {
+            setLoading(false)
           }
+          return
         }
 
         setLoading(false)

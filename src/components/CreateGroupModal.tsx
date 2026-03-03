@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Upload, MapPin, Users, FileText, Camera } from 'lucide-react';
+import { X, MapPin, Users, FileText } from 'lucide-react';
 
 interface CreateGroupModalProps {
   isOpen: boolean;
@@ -11,7 +11,6 @@ export interface GroupFormData {
   name: string;
   description: string;
   location?: string;
-  avatarUrl?: string;
 }
 
 export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
@@ -23,7 +22,6 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     name: '',
     description: '',
     location: '',
-    avatarUrl: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -52,7 +50,6 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
         name: '',
         description: '',
         location: '',
-        avatarUrl: ''
       });
       onClose();
     } catch (err) {
@@ -67,19 +64,6 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       ...prev,
       [e.target.name]: e.target.value
     }));
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // In a real app, you would upload to a service like AWS S3
-      // For now, we'll create a local URL
-      const imageUrl = URL.createObjectURL(file);
-      setFormData(prev => ({
-        ...prev,
-        avatarUrl: imageUrl
-      }));
-    }
   };
 
   if (!isOpen) return null;
@@ -103,33 +87,6 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               {error}
             </div>
           )}
-
-          {/* Group Avatar */}
-          <div className="text-center">
-            <div className="relative inline-block">
-              <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden">
-                {formData.avatarUrl ? (
-                  <img 
-                    src={formData.avatarUrl} 
-                    alt="Group avatar" 
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <Users className="w-12 h-12 text-white" />
-                )}
-              </div>
-              <label className="absolute -bottom-2 -right-2 bg-white border-2 border-gray-200 rounded-full p-2 cursor-pointer hover:bg-gray-50 transition-colors">
-                <Camera className="w-4 h-4 text-gray-600" />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="hidden"
-                />
-              </label>
-            </div>
-            <p className="text-sm text-gray-500">Upload group photo (optional)</p>
-          </div>
 
           {/* Group Name */}
           <div>

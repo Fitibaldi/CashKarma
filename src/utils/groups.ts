@@ -14,21 +14,25 @@ interface RawMember {
 }
 
 async function computeMemberBalances(groupId: string, members: RawMember[]): Promise<GroupMember[]> {
-  const { data: payments } = await supabase
-    .from('payments')
-    .select('from_user_id, amount, split_type, split_between')
-    .eq('group_id', groupId)
+  const [paymentsResult, settlementsResult] = await Promise.all([
+    supabase
+      .from('payments')
+      .select('from_user_id, amount, split_type, split_between')
+      .eq('group_id', groupId),
+    supabase
+      .from('settlements')
+      .select('from_user_id, to_user_id, amount')
+      .eq('group_id', groupId)
+  ])
 
-  const { data: settlements } = await supabase
-    .from('settlements')
-    .select('from_user_id, to_user_id, amount')
-    .eq('group_id', groupId)
+  const payments = paymentsResult.data ?? []
+  const settlements = settlementsResult.data ?? []
 
   const balanceMap: Record<string, { totalPaid: number; totalOwed: number; balance: number }> = {}
   members.forEach(m => { balanceMap[m.user_id] = { totalPaid: 0, totalOwed: 0, balance: 0 } })
 
   const memberIds = members.map(m => m.user_id)
-  ;(payments ?? []).forEach(p => {
+  payments.forEach(p => {
     const splitList: string[] = p.split_type === 'equal' ? memberIds : (p.split_between ?? [])
     const share = splitList.length > 0 ? p.amount / splitList.length : 0
     if (balanceMap[p.from_user_id]) {
@@ -42,7 +46,7 @@ async function computeMemberBalances(groupId: string, members: RawMember[]): Pro
       }
     })
   })
-  ;(settlements ?? []).forEach(s => {
+  settlements.forEach(s => {
     if (balanceMap[s.from_user_id]) balanceMap[s.from_user_id].balance += s.amount
     if (balanceMap[s.to_user_id]) balanceMap[s.to_user_id].balance -= s.amount
   })
@@ -73,49 +77,66 @@ export async function getStoredGroups(userId: string): Promise<Group[]> {
   if (error || !data) return []
 
   const result: Group[] = []
-  for (const row of data) {
+  
+  // Process groups in parallel instead of sequentially
+  const groupPromises = data.map(async (row) => {
     const g = row.groups as { id: string; name: string; description: string; avatar_url: string | null; location: string; currency: string; created_at: string } | null
-    if (!g) continue
+    if (!g) return null
 
-    const { count: memberCount } = await supabase
-      .from('group_members')
-      .select('*', { count: 'exact', head: true })
-      .eq('group_id', g.id)
+    try {
+      // Parallelize all queries for this group
+      const [memberCountResult, paymentsResult, memberRowsResult] = await Promise.all([
+        supabase
+          .from('group_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('group_id', g.id),
+        supabase
+          .from('payments')
+          .select('amount')
+          .eq('group_id', g.id),
+        supabase
+          .from('group_members')
+          .select('user_id, role, joined_at, profiles(id, first_name, last_name, email)')
+          .eq('group_id', g.id)
+      ])
 
-    const { data: expSum } = await supabase
-      .from('payments')
-      .select('amount')
-      .eq('group_id', g.id)
-    const totalExpenses = (expSum ?? []).reduce((sum, p) => sum + Number(p.amount), 0)
+      const memberCount = memberCountResult.count ?? 0
+      const totalExpenses = (paymentsResult.data ?? []).reduce((sum, p) => sum + Number(p.amount), 0)
+      
+      const memberBalances = await computeMemberBalances(g.id, (memberRowsResult.data ?? []) as RawMember[])
+      const myBalance = memberBalances.find(m => m.id === userId)?.balance ?? 0
 
-    const { data: memberRows } = await supabase
-      .from('group_members')
-      .select('user_id, role, joined_at, profiles(id, first_name, last_name, email)')
-      .eq('group_id', g.id)
+      return {
+        id: g.id,
+        name: g.name,
+        description: g.description ?? '',
+        memberCount,
+        totalExpenses,
+        currency: g.currency,
+        lastActivity: g.created_at,
+        avatarUrl: g.avatar_url ?? undefined,
+        location: g.location ?? undefined,
+        yourBalance: myBalance,
+      }
+    } catch (err) {
+      console.error(`Error loading group ${g.id}:`, err)
+      return null
+    }
+  })
 
-    const memberBalances = await computeMemberBalances(g.id, (memberRows ?? []) as RawMember[])
-    const myBalance = memberBalances.find(m => m.id === userId)?.balance ?? 0
-
-    result.push({
-      id: g.id,
-      name: g.name,
-      description: g.description ?? '',
-      memberCount: memberCount ?? 0,
-      totalExpenses,
-      currency: g.currency,
-      lastActivity: g.created_at,
-      avatarUrl: g.avatar_url ?? undefined,
-      location: g.location ?? undefined,
-      yourBalance: myBalance,
-    })
-  }
-  return result
+  const groups = await Promise.all(groupPromises)
+  return groups.filter((g): g is Group => g !== null)
 }
 
 export async function saveGroup(
   group: Omit<Group, 'id' | 'memberCount' | 'totalExpenses' | 'lastActivity' | 'yourBalance'>,
   userId: string
 ): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession()
+  console.log('saveGroup — session user id:', session?.user?.id, '| passed userId:', userId)
+  const { data: authTest } = await supabase.rpc('test_auth')
+  console.log('auth.uid() in DB:', authTest)
+
   const { data, error } = await supabase
     .from('groups')
     .insert({
@@ -298,12 +319,10 @@ export async function acceptGroupInvitation(invitationId: string): Promise<boole
 
   const { error: memberError } = await supabase
     .from('group_members')
-    .upsert(
-      { group_id: inv.group_id, user_id: inv.invited_user_id, role: 'member' },
-      { onConflict: 'group_id,user_id', ignoreDuplicates: true }
-    )
+    .insert({ group_id: inv.group_id, user_id: inv.invited_user_id, role: 'member' })
 
-  return !memberError
+  // 23505 = unique_violation (already a member) — treat as success
+  return !memberError || memberError.code === '23505'
 }
 
 export async function declineGroupInvitation(invitationId: string): Promise<boolean> {
@@ -324,13 +343,12 @@ export async function getUserAcceptedGroups(_userId: string): Promise<Group[]> {
 // ============================================================
 
 export async function getInviteCodeForGroup(groupId: string): Promise<string | null> {
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('invite_codes')
     .select('code')
     .eq('group_id', groupId)
-    .single()
-  if (error || !data) return null
-  return data.code
+    .maybeSingle<{ code: string }>()
+  return data?.code ?? null
 }
 
 export async function generateInviteCode(groupId: string): Promise<string> {
@@ -359,11 +377,9 @@ export async function joinGroupByCode(code: string, userId: string): Promise<boo
 export async function joinGroupByInvite(groupId: string, userId: string): Promise<boolean> {
   const { error } = await supabase
     .from('group_members')
-    .upsert(
-      { group_id: groupId, user_id: userId, role: 'member' },
-      { onConflict: 'group_id,user_id', ignoreDuplicates: true }
-    )
-  return !error
+    .insert({ group_id: groupId, user_id: userId, role: 'member' })
+  // 23505 = unique_violation (already a member) — treat as success
+  return !error || error.code === '23505'
 }
 
 export async function getGroupByInviteId(groupId: string): Promise<Group | null> {
