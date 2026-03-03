@@ -54,12 +54,6 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
       return;
     }
 
-    if (!formData.description.trim()) {
-      setError('Please enter a description');
-      setLoading(false);
-      return;
-    }
-
     if (formData.splitType === 'specific' && formData.selectedMembers.includes(formData.fromUserId) && formData.selectedMembers.length === 1) {
       setError('Cannot split payment only with yourself');
       setLoading(false);
@@ -177,6 +171,28 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
             </div>
           </div>
 
+          {/* Amount */}
+          <div>
+            <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
+              Amount *
+            </label>
+            <div className="relative">
+              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                id="amount"
+                name="amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                required
+                value={formData.amount}
+                onChange={handleChange}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                placeholder={`Enter amount in ${currency}`}
+              />
+            </div>
+          </div>
+
           {/* Split Options */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -255,39 +271,16 @@ export const AddPaymentModal: React.FC<AddPaymentModalProps> = ({
             )}
             </div>
 
-          {/* Amount */}
-          <div>
-            <label htmlFor="amount" className="block text-sm font-medium text-gray-700 mb-2">
-              Amount *
-            </label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                id="amount"
-                name="amount"
-                type="number"
-                step="0.01"
-                min="0.01"
-                required
-                value={formData.amount}
-                onChange={handleChange}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
-                placeholder={`Enter amount in ${currency}`}
-              />
-            </div>
-          </div>
-
           {/* Description */}
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-              Description *
+              Description
             </label>
             <div className="relative">
               <FileText className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
               <textarea
                 id="description"
                 name="description"
-                required
                 value={formData.description}
                 onChange={handleChange}
                 rows={3}
