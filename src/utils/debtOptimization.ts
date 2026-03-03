@@ -14,6 +14,7 @@ export const optimizeDebts = (members: GroupMember[], currency: string): DebtDet
   const balances = members.map(member => ({
     userId: member.id,
     userName: `${member.firstName} ${member.lastName}`,
+    avatarUrl: member.avatarUrl,
     balance: member.balance
   })).filter(b => Math.abs(b.balance) > 0.01); // Ignore very small amounts
 
@@ -49,8 +50,10 @@ export const optimizeDebts = (members: GroupMember[], currency: string): DebtDet
     debts.push({
       fromUserId: debtor.userId,
       fromUserName: debtor.userName,
+      fromUserAvatarUrl: debtor.avatarUrl,
       toUserId: creditor.userId,
       toUserName: creditor.userName,
+      toUserAvatarUrl: creditor.avatarUrl,
       amount: settlementAmount,
       currency
     });

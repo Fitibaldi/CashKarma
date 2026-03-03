@@ -30,6 +30,7 @@ create table public.groups (
   avatar_url   text,
   location     text not null default '',
   currency     text not null default '€',
+  is_archived  boolean not null default false,
   created_by   uuid not null references public.profiles(id),
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
@@ -270,6 +271,11 @@ create policy "group_members: self can update own"
   to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+
+create policy "group_members: self can leave"
+  on public.group_members for delete
+  to authenticated
+  using (user_id = auth.uid());
 
 -- ============================================================
 -- RLS POLICIES: payments

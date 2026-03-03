@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { CreditCard, Clock, CheckCircle, Banknote, Building, Smartphone, DollarSign, Edit, ChevronDown, ChevronUp } from 'lucide-react';
-import { Payment } from '../types/group';
+import { Payment, GroupMember } from '../types/group';
 
 interface PaymentHistoryProps {
   payments: Payment[];
   onEditPayment?: (payment: Payment) => void;
   currentUserId?: string;
+  members?: GroupMember[];
 }
 
 const getPaymentMethodIcon = (method: string) => {
@@ -41,8 +42,14 @@ const getPaymentMethodColor = (method: string) => {
 export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
   payments,
   onEditPayment,
-  currentUserId
+  currentUserId,
+  members
 }) => {
+  const memberAvatarMap = React.useMemo(() => {
+    const map: Record<string, string | undefined> = {};
+    members?.forEach(m => { map[m.id] = m.avatarUrl; });
+    return map;
+  }, [members]);
   const [isOpen, setIsOpen] = useState(true);
 
   if (payments.length === 0) {
@@ -81,8 +88,12 @@ export const PaymentHistory: React.FC<PaymentHistoryProps> = ({
         {payments.map((payment) => (
           <div key={payment.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border border-gray-100 rounded-lg hover:bg-gray-50 transition-colors gap-3">
             <div className="flex items-start space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-                {payment.fromUserName.split(' ').map(n => n.charAt(0)).join('')}
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 overflow-hidden">
+                {memberAvatarMap[payment.fromUserId] ? (
+                  <img src={memberAvatarMap[payment.fromUserId]} alt={payment.fromUserName} className="w-full h-full object-cover" />
+                ) : (
+                  payment.fromUserName.split(' ').map(n => n.charAt(0)).join('')
+                )}
               </div>
               <div className="min-w-0">
                 <p className="font-medium text-gray-900 flex flex-wrap gap-x-1">

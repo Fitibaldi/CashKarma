@@ -11,7 +11,7 @@ interface RawMember {
   user_id: string
   role: string
   joined_at: string
-  profiles: { id: string; first_name: string; last_name: string; email: string } | null
+  profiles: { id: string; first_name: string; last_name: string; email: string; avatar_url: string | null } | null
 }
 
 async function computeMemberBalances(groupId: string, members: RawMember[]): Promise<GroupMember[]> {
@@ -62,6 +62,7 @@ async function computeMemberBalances(groupId: string, members: RawMember[]): Pro
     totalPaid: balanceMap[m.user_id]?.totalPaid ?? 0,
     totalOwed: balanceMap[m.user_id]?.totalOwed ?? 0,
     balance: balanceMap[m.user_id]?.balance ?? 0,
+    avatarUrl: m.profiles?.avatar_url ?? undefined,
   }))
 }
 
@@ -69,19 +70,29 @@ async function computeMemberBalances(groupId: string, members: RawMember[]): Pro
 // GROUPS
 // ============================================================
 
+function formatGroupDate(isoString: string): string {
+  if (!isoString) return ''
+  const d = new Date(isoString)
+  if (isNaN(d.getTime())) return isoString
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mi = String(d.getMinutes()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`
+}
+
 export async function getStoredGroups(userId: string): Promise<Group[]> {
   const { data, error } = await supabase
     .from('group_members')
-    .select('group_id, role, joined_at, groups(id, name, description, avatar_url, location, currency, created_at)')
+    .select('group_id, role, joined_at, groups(id, name, description, avatar_url, location, currency, created_at, is_archived, created_by)')
     .eq('user_id', userId)
 
   if (error || !data) return []
 
-  const result: Group[] = []
-  
   // Process groups in parallel instead of sequentially
   const groupPromises = data.map(async (row) => {
-    const g = row.groups as { id: string; name: string; description: string; avatar_url: string | null; location: string; currency: string; created_at: string } | null
+    const g = row.groups as { id: string; name: string; description: string; avatar_url: string | null; location: string; currency: string; created_at: string; is_archived: boolean; created_by: string } | null
     if (!g) return null
 
     try {
@@ -97,13 +108,13 @@ export async function getStoredGroups(userId: string): Promise<Group[]> {
           .eq('group_id', g.id),
         supabase
           .from('group_members')
-          .select('user_id, role, joined_at, profiles(id, first_name, last_name, email)')
+          .select('user_id, role, joined_at, profiles(id, first_name, last_name, email, avatar_url)')
           .eq('group_id', g.id)
       ])
 
       const memberCount = memberCountResult.count ?? 0
       const totalExpenses = (paymentsResult.data ?? []).reduce((sum, p) => sum + Number(p.amount), 0)
-      
+
       const memberBalances = await computeMemberBalances(g.id, (memberRowsResult.data ?? []) as RawMember[])
       const myBalance = memberBalances.find(m => m.id === userId)?.balance ?? 0
 
@@ -114,10 +125,12 @@ export async function getStoredGroups(userId: string): Promise<Group[]> {
         memberCount,
         totalExpenses,
         currency: g.currency,
-        lastActivity: g.created_at,
+        lastActivity: formatGroupDate(g.created_at),
         avatarUrl: g.avatar_url ?? undefined,
         location: g.location ?? undefined,
         yourBalance: myBalance,
+        isArchived: g.is_archived ?? false,
+        createdBy: g.created_by,
       }
     } catch (err) {
       console.error(`Error loading group ${g.id}:`, err)
@@ -126,7 +139,7 @@ export async function getStoredGroups(userId: string): Promise<Group[]> {
   })
 
   const groups = await Promise.all(groupPromises)
-  return groups.filter((g): g is Group => g !== null)
+  return groups.filter(g => g !== null) as Group[]
 }
 
 export async function saveGroup(
@@ -160,17 +173,18 @@ export async function saveGroup(
 // ============================================================
 
 export async function getStoredGroupDetails(groupId: string): Promise<GroupDetails | null> {
-  const { data: group, error } = await supabase
+  const { data: rawGroup, error } = await supabase
     .from('groups')
     .select('*')
     .eq('id', groupId)
     .single()
 
-  if (error || !group) return null
+  if (error || !rawGroup) return null
+  const group = rawGroup as { id: string; name: string; description: string; avatar_url: string | null; location: string; currency: string; created_by: string; created_at: string; is_archived: boolean }
 
   const { data: memberRows } = await supabase
     .from('group_members')
-    .select('user_id, role, joined_at, profiles(id, first_name, last_name, email)')
+    .select('user_id, role, joined_at, profiles(id, first_name, last_name, email, avatar_url)')
     .eq('group_id', groupId)
 
   const members = await computeMemberBalances(groupId, (memberRows ?? []) as RawMember[])
@@ -181,7 +195,8 @@ export async function getStoredGroupDetails(groupId: string): Promise<GroupDetai
     .eq('group_id', groupId)
     .order('created_at', { ascending: false })
 
-  const payments: Payment[] = (paymentRows ?? []).map(p => ({
+  type RawPayment = { id: string; from_user_id: string; from_user_name: string; to_user_id: string | null; amount: number; currency: string; description: string; date: string; method: string; status: string; split_type: string; split_between: string[] | null; paid_by: string; group_id: string; created_at: string; updated_at: string }
+  const payments: Payment[] = ((paymentRows ?? []) as RawPayment[]).map(p => ({
     id: p.id,
     fromUserId: p.from_user_id,
     fromUserName: p.from_user_name,
@@ -206,7 +221,8 @@ export async function getStoredGroupDetails(groupId: string): Promise<GroupDetai
     .select('*')
     .eq('group_id', groupId)
 
-  const settlements: Settlement[] = (settlementRows ?? []).map(s => ({
+  type RawSettlement = { id: string; group_id: string; from_user_id: string; to_user_id: string; amount: number; created_at: string }
+  const settlements: Settlement[] = ((settlementRows ?? []) as RawSettlement[]).map(s => ({
     id: s.id,
     groupId: s.group_id,
     fromUserId: s.from_user_id,
@@ -239,6 +255,7 @@ export async function getStoredGroupDetails(groupId: string): Promise<GroupDetai
     settlements,
     totalExpenses,
     currency: group.currency,
+    isArchived: group.is_archived ?? false,
   }
 }
 
@@ -251,6 +268,48 @@ export async function createGroupDetails(group: Group, user: User): Promise<void
 
 // No-op kept for call-site compat — data is in normalised tables now
 export async function saveGroupDetails(_groupId: string, _details: GroupDetails): Promise<void> {}
+
+export async function archiveGroup(groupId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('groups')
+    .update({ is_archived: true, updated_at: new Date().toISOString() })
+    .eq('id', groupId)
+  return !error
+}
+
+export async function leaveGroup(groupId: string, userId: string): Promise<boolean> {
+  // For specific-split payments, remove the leaving user from split_between
+  // so remaining members absorb the full amount correctly
+  const { data: specificPayments } = await supabase
+    .from('payments')
+    .select('id, split_between')
+    .eq('group_id', groupId)
+    .eq('split_type', 'specific')
+
+  const paymentsToUpdate = (specificPayments ?? []).filter(
+    p => Array.isArray(p.split_between) && (p.split_between as string[]).includes(userId)
+  )
+
+  if (paymentsToUpdate.length > 0) {
+    await Promise.all(
+      paymentsToUpdate.map(p =>
+        supabase
+          .from('payments')
+          .update({ split_between: (p.split_between as string[]).filter(id => id !== userId) })
+          .eq('id', p.id)
+      )
+    )
+  }
+
+  // Remove user from the group
+  const { error } = await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+
+  return !error
+}
 
 // ============================================================
 // INVITATIONS
@@ -616,7 +675,7 @@ export async function deletePaymentFromGroup(
   deletedByUserId: string,
   deletedByName: string,
   paymentDescription: string,
-  currency: string
+  _currency: string
 ): Promise<void> {
   // Fetch members before deleting so we can notify them
   const { data: memberRows } = await supabase
@@ -696,7 +755,8 @@ export async function getGroupSettlements(groupId: string): Promise<Settlement[]
     .eq('group_id', groupId)
     .order('created_at', { ascending: false })
   if (error || !data) return []
-  return data.map(s => ({
+  type RawSettlement = { id: string; group_id: string; from_user_id: string; to_user_id: string; amount: number; created_at: string }
+  return (data as RawSettlement[]).map(s => ({
     id: s.id,
     groupId: s.group_id,
     fromUserId: s.from_user_id,

@@ -8,7 +8,7 @@ import { DebtSummary } from '../components/DebtSummary';
 import { SettleDebtModal } from '../components/SettleDebtModal';
 import { MembersList } from '../components/MembersList';
 import { PaymentHistory } from '../components/PaymentHistory';
-import { getStoredGroupDetails, createGroupInvitations, addPaymentToGroup, updatePaymentInGroup, addSettlementToGroup } from '../utils/groups';
+import { getStoredGroupDetails, createGroupInvitations, addPaymentToGroup, updatePaymentInGroup, addSettlementToGroup, archiveGroup, leaveGroup } from '../utils/groups';
 import { DebtDetail, GroupDetails, Payment, Settlement } from '../types/group';
 import { useAuth } from '../contexts/AuthContext';
 import { optimizeDebts } from '../utils/debtOptimization';
@@ -102,6 +102,22 @@ export const GroupDetailsPage: React.FC = () => {
     await loadDetails();
   };
 
+  const handleArchive = async () => {
+    if (!groupId) return;
+    const confirmed = window.confirm('Archive this group? Payments and invitations will be disabled.');
+    if (!confirmed) return;
+    await archiveGroup(groupId);
+    await loadDetails();
+  };
+
+  const handleLeaveGroup = async () => {
+    if (!groupId || !user) return;
+    const confirmed = window.confirm('Leave this group? Your share of split payments will be redistributed among the remaining members.');
+    if (!confirmed) return;
+    const success = await leaveGroup(groupId, user.id);
+    if (success) navigate('/');
+  };
+
   // Calculate optimized debts
   const optimizedDebts = optimizeDebts(groupDetails.members, groupDetails.currency);
 
@@ -109,9 +125,12 @@ export const GroupDetailsPage: React.FC = () => {
     <div className="min-h-screen bg-gray-50">
       <GroupDetailsHeader
         group={groupDetails}
+        currentUserId={user?.id || ''}
         onBack={() => navigate('/')}
         onInviteMembers={handleInviteMembers}
         onAddPayment={handleAddPayment}
+        onArchive={handleArchive}
+        onLeaveGroup={handleLeaveGroup}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -132,6 +151,7 @@ export const GroupDetailsPage: React.FC = () => {
             payments={groupDetails.payments}
             onEditPayment={handleEditPayment}
             currentUserId={user?.id}
+            members={groupDetails.members}
           />
         </div>
       </main>

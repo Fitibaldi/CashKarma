@@ -94,9 +94,12 @@ export const DashboardPage: React.FC = () => {
     if (user) await loadData(user.id);
   };
 
-  const totalBalance = groups.reduce((sum, group) => sum + group.yourBalance, 0);
-  const youOwe = groups.filter(g => g.yourBalance < 0).reduce((sum, g) => sum + Math.abs(g.yourBalance), 0);
-  const youAreOwed = groups.filter(g => g.yourBalance > 0).reduce((sum, g) => sum + g.yourBalance, 0);
+  const activeGroups = groups.filter(g => !g.isArchived);
+  const archivedGroups = groups.filter(g => g.isArchived);
+
+  const totalBalance = activeGroups.reduce((sum, group) => sum + group.yourBalance, 0);
+  const youOwe = activeGroups.filter(g => g.yourBalance < 0).reduce((sum, g) => sum + Math.abs(g.yourBalance), 0);
+  const youAreOwed = activeGroups.filter(g => g.yourBalance > 0).reduce((sum, g) => sum + g.yourBalance, 0);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -166,22 +169,45 @@ export const DashboardPage: React.FC = () => {
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Your Groups</h2>
           <div className="text-sm text-gray-500">
-            {groups.length} {groups.length === 1 ? 'group' : 'groups'}
+            {activeGroups.length} {activeGroups.length === 1 ? 'group' : 'groups'}
           </div>
         </div>
 
-        {groups.length === 0 ? (
+        {activeGroups.length === 0 && archivedGroups.length === 0 ? (
           <EmptyState onCreateGroup={handleCreateGroup} />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {groups.map((group) => (
+            {activeGroups.map((group) => (
               <GroupCard
                 key={group.id}
                 {...group}
+                isOwner={group.createdBy === user?.id}
                 onClick={handleGroupClick}
               />
             ))}
           </div>
+        )}
+
+        {/* Archived Groups Section */}
+        {archivedGroups.length > 0 && (
+          <>
+            <div className="flex items-center justify-between mt-10 mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Archived Groups</h2>
+              <div className="text-sm text-gray-500">
+                {archivedGroups.length} {archivedGroups.length === 1 ? 'group' : 'groups'}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {archivedGroups.map((group) => (
+                <GroupCard
+                  key={group.id}
+                  {...group}
+                  isOwner={group.createdBy === user?.id}
+                  onClick={handleGroupClick}
+                />
+              ))}
+            </div>
+          </>
         )}
       </main>
 

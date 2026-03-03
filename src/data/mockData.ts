@@ -9,6 +9,8 @@ export interface Group {
   avatarUrl?: string;
   location?: string;
   yourBalance: number;
+  isArchived?: boolean;
+  createdBy?: string;
 }
 
 export const mockGroups: Group[] = [

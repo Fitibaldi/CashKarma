@@ -8,6 +8,7 @@ export interface GroupMember {
   totalPaid: number;
   totalOwed: number;
   balance: number;
+  avatarUrl?: string;
 }
 
 export interface Payment {
@@ -53,6 +54,7 @@ export interface GroupDetails {
   settlements?: Settlement[];
   totalExpenses: number;
   currency: string;
+  isArchived: boolean;
 }
 
 export interface GroupInvitation {
@@ -92,8 +94,10 @@ export interface Notification {
 export interface DebtDetail {
   fromUserId: string;
   fromUserName: string;
+  fromUserAvatarUrl?: string;
   toUserId: string;
   toUserName: string;
+  toUserAvatarUrl?: string;
   amount: number;
   currency: string;
 }

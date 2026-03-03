@@ -62,8 +62,12 @@ export const DebtSummary: React.FC<DebtSummaryProps> = ({
               {userDebts.map((debt, index) => (
                 <div key={index} className="flex items-center justify-between p-4 bg-red-50 rounded-lg border border-red-100">
                   <div className="flex items-center space-x-3 min-w-0">
-                    <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-600 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">
-                      {debt.toUserName.charAt(0)}
+                    <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-pink-600 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0 overflow-hidden">
+                      {debt.toUserAvatarUrl ? (
+                        <img src={debt.toUserAvatarUrl} alt={debt.toUserName} className="w-full h-full object-cover" />
+                      ) : (
+                        debt.toUserName.charAt(0)
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="font-medium text-gray-900 truncate">{debt.toUserName}</p>
@@ -92,8 +96,12 @@ export const DebtSummary: React.FC<DebtSummaryProps> = ({
               {userCredits.map((debt, index) => (
                 <div key={index} className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-100">
                   <div className="flex items-center space-x-3 min-w-0">
-                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0">
-                      {debt.fromUserName.charAt(0)}
+                    <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0 overflow-hidden">
+                      {debt.fromUserAvatarUrl ? (
+                        <img src={debt.fromUserAvatarUrl} alt={debt.fromUserName} className="w-full h-full object-cover" />
+                      ) : (
+                        debt.fromUserName.charAt(0)
+                      )}
                     </div>
                     <div className="min-w-0">
                       <p className="font-medium text-gray-900 truncate">{debt.fromUserName}</p>
@@ -130,8 +138,12 @@ export const DebtSummary: React.FC<DebtSummaryProps> = ({
                 .map((debt, index) => (
                   <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
                     <div className="flex items-center space-x-3 min-w-0">
-                      <div className="w-8 h-8 bg-gradient-to-br from-gray-500 to-gray-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-                        {debt.fromUserName.charAt(0)}
+                      <div className="w-8 h-8 bg-gradient-to-br from-gray-500 to-gray-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 overflow-hidden">
+                        {debt.fromUserAvatarUrl ? (
+                          <img src={debt.fromUserAvatarUrl} alt={debt.fromUserName} className="w-full h-full object-cover" />
+                        ) : (
+                          debt.fromUserName.charAt(0)
+                        )}
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-900 flex flex-wrap gap-x-1">
