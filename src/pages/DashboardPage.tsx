@@ -104,7 +104,6 @@ export const DashboardPage: React.FC = () => {
         onCreateGroup={handleCreateGroup}
         onJoinGroup={() => setIsJoinModalOpen(true)}
         onProfileClick={handleProfileClick}
-        notificationCount={3}
         user={user}
       />
       

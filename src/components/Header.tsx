@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { Plus, Bell, Search, Euro, LogIn } from 'lucide-react';
 import { User } from '../types/auth';
+import { useNotifications } from '../contexts/NotificationsContext';
+import { NotificationPanel } from './NotificationPanel';
 
 interface HeaderProps {
   onCreateGroup: () => void;
   onJoinGroup?: () => void;
   onProfileClick: () => void;
-  notificationCount?: number;
   user?: User | null;
 }
 
@@ -14,9 +15,12 @@ export const Header: React.FC<HeaderProps> = ({
   onCreateGroup,
   onJoinGroup,
   onProfileClick,
-  notificationCount = 0,
   user
 }) => {
+  const { unreadCount } = useNotifications();
+  const [panelOpen, setPanelOpen] = useState(false);
+  const bellRef = useRef<HTMLButtonElement>(null);
+
   const initials = user
     ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
     : '?';
@@ -61,14 +65,27 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="hidden sm:inline">New Group</span>
             </button>
 
-            <button className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors">
-              <Bell className="w-5 h-5" />
-              {notificationCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {notificationCount > 9 ? '9+' : notificationCount}
-                </span>
-              )}
-            </button>
+            {/* Notification bell — positioned relative so the panel anchors here */}
+            <div className="relative">
+              <button
+                ref={bellRef}
+                onClick={() => setPanelOpen(prev => !prev)}
+                className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
+                aria-label="Notifications"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              <NotificationPanel
+                isOpen={panelOpen}
+                onClose={() => setPanelOpen(false)}
+                anchorRef={bellRef}
+              />
+            </div>
 
             <button
               onClick={onProfileClick}

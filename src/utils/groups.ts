@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase'
 import { Group } from '../data/mockData';
 import { GroupDetails, GroupMember, Payment, Settlement, GroupInvitation } from '../types/group';
 import { User } from '../types/auth';
+import { createNotifications } from './notifications';
 
 // ============================================================
 // INTERNAL: compute member balances from payments + settlements
@@ -270,6 +271,26 @@ export async function createGroupInvitations(
   await supabase
     .from('group_invitations')
     .upsert(rows, { onConflict: 'group_id,invited_user_id', ignoreDuplicates: true })
+
+  // Notify invited users
+  const [groupRes, inviterRes] = await Promise.all([
+    supabase.from('groups').select('name').eq('id', groupId).single(),
+    supabase.from('profiles').select('first_name, last_name').eq('id', invitedBy).single(),
+  ])
+  const groupName = groupRes.data?.name ?? 'a group'
+  const inviterName = inviterRes.data
+    ? `${inviterRes.data.first_name} ${inviterRes.data.last_name}`
+    : 'Someone'
+  await createNotifications(
+    userIds.map(uid => ({
+      userId: uid,
+      type: 'invitation_received' as const,
+      title: `You were invited to ${groupName}`,
+      body: `${inviterName} invited you to join "${groupName}"`,
+      groupId,
+      actorId: invitedBy,
+    }))
+  )
 }
 
 export async function getUserInvitations(userId: string): Promise<GroupInvitation[]> {
@@ -304,7 +325,7 @@ export async function getUserInvitations(userId: string): Promise<GroupInvitatio
 export async function acceptGroupInvitation(invitationId: string): Promise<boolean> {
   const { data: inv, error: fetchError } = await supabase
     .from('group_invitations')
-    .select('group_id, invited_user_id')
+    .select('group_id, invited_user_id, invited_by')
     .eq('id', invitationId)
     .single()
 
@@ -322,7 +343,51 @@ export async function acceptGroupInvitation(invitationId: string): Promise<boole
     .insert({ group_id: inv.group_id, user_id: inv.invited_user_id, role: 'member' })
 
   // 23505 = unique_violation (already a member) — treat as success
-  return !memberError || memberError.code === '23505'
+  const ok = !memberError || memberError.code === '23505'
+  if (!ok) return false
+
+  // Notify the inviter and all other group members
+  const [groupRes, accepterRes] = await Promise.all([
+    supabase.from('groups').select('name').eq('id', inv.group_id).single(),
+    supabase.from('profiles').select('first_name, last_name').eq('id', inv.invited_user_id).single(),
+  ])
+  const groupName = groupRes.data?.name ?? 'your group'
+  const accepterName = accepterRes.data
+    ? `${accepterRes.data.first_name} ${accepterRes.data.last_name}`
+    : 'Someone'
+
+  // Notify the original inviter
+  await createNotifications([{
+    userId: inv.invited_by,
+    type: 'invitation_accepted',
+    title: `${accepterName} joined ${groupName}`,
+    body: `${accepterName} accepted your invitation to "${groupName}"`,
+    groupId: inv.group_id,
+    actorId: inv.invited_user_id,
+  }])
+
+  // Notify existing group members (excluding the inviter and the new member)
+  const { data: memberRows } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', inv.group_id)
+  const otherMembers = (memberRows ?? [])
+    .map(r => r.user_id as string)
+    .filter(uid => uid !== inv.invited_by && uid !== inv.invited_user_id)
+  if (otherMembers.length > 0) {
+    await createNotifications(
+      otherMembers.map(uid => ({
+        userId: uid,
+        type: 'member_joined' as const,
+        title: `New member in ${groupName}`,
+        body: `${accepterName} joined "${groupName}"`,
+        groupId: inv.group_id,
+        actorId: inv.invited_user_id,
+      }))
+    )
+  }
+
+  return true
 }
 
 export async function declineGroupInvitation(invitationId: string): Promise<boolean> {
@@ -379,7 +444,38 @@ export async function joinGroupByInvite(groupId: string, userId: string): Promis
     .from('group_members')
     .insert({ group_id: groupId, user_id: userId, role: 'member' })
   // 23505 = unique_violation (already a member) — treat as success
-  return !error || error.code === '23505'
+  if (error && error.code !== '23505') return false
+
+  // Notify all existing members that someone joined
+  const [groupRes, joinerRes] = await Promise.all([
+    supabase.from('groups').select('name').eq('id', groupId).single(),
+    supabase.from('profiles').select('first_name, last_name').eq('id', userId).single(),
+  ])
+  const groupName = groupRes.data?.name ?? 'your group'
+  const joinerName = joinerRes.data
+    ? `${joinerRes.data.first_name} ${joinerRes.data.last_name}`
+    : 'Someone'
+  const { data: memberRows } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', groupId)
+  const otherMembers = (memberRows ?? [])
+    .map(r => r.user_id as string)
+    .filter(uid => uid !== userId)
+  if (otherMembers.length > 0) {
+    await createNotifications(
+      otherMembers.map(uid => ({
+        userId: uid,
+        type: 'member_joined' as const,
+        title: `New member in ${groupName}`,
+        body: `${joinerName} joined "${groupName}" via invite link`,
+        groupId,
+        actorId: userId,
+      }))
+    )
+  }
+
+  return true
 }
 
 export async function getGroupByInviteId(groupId: string): Promise<Group | null> {
@@ -433,6 +529,32 @@ export async function addPaymentToGroup(
     paid_by: payment.paidBy,
   })
   if (error) throw new Error(error.message)
+
+  // Notify all group members except the one who added the payment
+  const { data: memberRows } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', groupId)
+  const otherMembers = (memberRows ?? [])
+    .map(r => r.user_id as string)
+    .filter(uid => uid !== payment.fromUserId)
+  if (otherMembers.length > 0) {
+    const { data: groupRow } = await supabase
+      .from('groups')
+      .select('name')
+      .eq('id', groupId)
+      .single()
+    await createNotifications(
+      otherMembers.map(uid => ({
+        userId: uid,
+        type: 'payment_added' as const,
+        title: `New expense in ${groupRow?.name ?? 'your group'}`,
+        body: `${payment.fromUserName} added "${payment.description}" — ${payment.currency}${payment.amount.toFixed(2)}`,
+        groupId,
+        actorId: payment.fromUserId,
+      }))
+    )
+  }
 }
 
 export async function updatePaymentInGroup(
@@ -460,6 +582,76 @@ export async function updatePaymentInGroup(
     .eq('id', paymentId)
     .eq('group_id', groupId)
   if (error) throw new Error(error.message)
+
+  // Notify all group members except the one who edited
+  const { data: memberRows } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', groupId)
+  const otherMembers = (memberRows ?? [])
+    .map(r => r.user_id as string)
+    .filter(uid => uid !== payment.fromUserId)
+  if (otherMembers.length > 0) {
+    const { data: groupRow } = await supabase
+      .from('groups')
+      .select('name')
+      .eq('id', groupId)
+      .single()
+    await createNotifications(
+      otherMembers.map(uid => ({
+        userId: uid,
+        type: 'payment_edited' as const,
+        title: `Expense updated in ${groupRow?.name ?? 'your group'}`,
+        body: `${payment.fromUserName} edited "${payment.description}" — ${payment.currency}${payment.amount.toFixed(2)}`,
+        groupId,
+        actorId: payment.fromUserId,
+      }))
+    )
+  }
+}
+
+export async function deletePaymentFromGroup(
+  groupId: string,
+  paymentId: string,
+  deletedByUserId: string,
+  deletedByName: string,
+  paymentDescription: string,
+  currency: string
+): Promise<void> {
+  // Fetch members before deleting so we can notify them
+  const { data: memberRows } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', groupId)
+
+  const { data: groupRow } = await supabase
+    .from('groups')
+    .select('name')
+    .eq('id', groupId)
+    .single()
+
+  const { error } = await supabase
+    .from('payments')
+    .delete()
+    .eq('id', paymentId)
+    .eq('group_id', groupId)
+  if (error) throw new Error(error.message)
+
+  const otherMembers = (memberRows ?? [])
+    .map(r => r.user_id as string)
+    .filter(uid => uid !== deletedByUserId)
+  if (otherMembers.length > 0) {
+    await createNotifications(
+      otherMembers.map(uid => ({
+        userId: uid,
+        type: 'payment_deleted' as const,
+        title: `Expense removed in ${groupRow?.name ?? 'your group'}`,
+        body: `${deletedByName} deleted "${paymentDescription}"`,
+        groupId,
+        actorId: deletedByUserId,
+      }))
+    )
+  }
 }
 
 // ============================================================
@@ -477,6 +669,24 @@ export async function addSettlementToGroup(
     amount: settlement.amount,
   })
   if (error) throw new Error(error.message)
+
+  // Notify the recipient of the settlement
+  const [groupRes, payerRes] = await Promise.all([
+    supabase.from('groups').select('name').eq('id', groupId).single(),
+    supabase.from('profiles').select('first_name, last_name').eq('id', settlement.fromUserId).single(),
+  ])
+  const groupName = groupRes.data?.name ?? 'your group'
+  const payerName = payerRes.data
+    ? `${payerRes.data.first_name} ${payerRes.data.last_name}`
+    : 'Someone'
+  await createNotifications([{
+    userId: settlement.toUserId,
+    type: 'settlement_recorded',
+    title: `Payment received in ${groupName}`,
+    body: `${payerName} settled €${settlement.amount.toFixed(2)} with you in "${groupName}"`,
+    groupId,
+    actorId: settlement.fromUserId,
+  }])
 }
 
 export async function getGroupSettlements(groupId: string): Promise<Settlement[]> {

@@ -68,6 +68,27 @@ export interface GroupInvitation {
   acceptedAt?: string;
 }
 
+export type NotificationType =
+  | 'payment_added'
+  | 'payment_edited'
+  | 'payment_deleted'
+  | 'invitation_received'
+  | 'invitation_accepted'
+  | 'settlement_recorded'
+  | 'member_joined';
+
+export interface Notification {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  groupId?: string;
+  actorId?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export interface DebtDetail {
   fromUserId: string;
   fromUserName: string;

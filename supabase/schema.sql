@@ -109,6 +109,25 @@ create table public.invite_codes (
 );
 
 -- ============================================================
+-- TABLE: notifications
+-- ============================================================
+create table public.notifications (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  type       text not null check (type in (
+               'payment_added', 'payment_edited', 'payment_deleted',
+               'invitation_received', 'invitation_accepted',
+               'settlement_recorded', 'member_joined'
+             )),
+  title      text not null,
+  body       text not null,
+  group_id   uuid references public.groups(id) on delete cascade,
+  actor_id   uuid references public.profiles(id) on delete set null,
+  is_read    boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- ============================================================
 -- INDEXES
 -- ============================================================
 create index on public.group_members(user_id);
@@ -118,6 +137,8 @@ create index on public.settlements(group_id);
 create index on public.group_invitations(invited_user_id);
 create index on public.group_invitations(group_id);
 create index on public.invite_codes(code);
+create index on public.notifications(user_id);
+create index on public.notifications(is_read);
 
 -- ============================================================
 -- TRIGGER: auto-create profile row on auth signup
@@ -331,3 +352,27 @@ create policy "invite_codes: creator can insert"
       where g.id = group_id and g.created_by = auth.uid()
     )
   );
+
+-- ============================================================
+-- ENABLE RLS: notifications
+-- ============================================================
+alter table public.notifications enable row level security;
+
+-- ============================================================
+-- RLS POLICIES: notifications
+-- ============================================================
+create policy "notifications: user can read own"
+  on public.notifications for select
+  to authenticated
+  using (user_id = auth.uid());
+
+create policy "notifications: authenticated can insert"
+  on public.notifications for insert
+  to authenticated
+  with check (true);
+
+create policy "notifications: user can update own"
+  on public.notifications for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { NotificationsProvider } from './contexts/NotificationsContext';
 import { AuthPage } from './pages/AuthPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { GroupDetailsPage } from './pages/GroupDetailsPage';
@@ -56,7 +57,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppContent />
+        <NotificationsProvider>
+          <AppContent />
+        </NotificationsProvider>
       </AuthProvider>
     </Router>
   );
