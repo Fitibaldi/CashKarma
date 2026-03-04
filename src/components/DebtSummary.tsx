@@ -74,10 +74,19 @@ export const DebtSummary: React.FC<DebtSummaryProps> = ({
                       <p className="text-sm text-gray-600">You owe</p>
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0 ml-3">
-                    <p className="text-lg font-bold text-red-600">
-                      {currency}{debt.amount.toFixed(2)}
-                    </p>
+                  <div className="flex items-center space-x-2 flex-shrink-0 ml-3">
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-red-600">
+                        {currency}{debt.amount.toFixed(2)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => onSettle(debt)}
+                      className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-sm font-medium transition-colors flex items-center space-x-1 flex-shrink-0"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Settle</span>
+                    </button>
                   </div>
                 </div>
               ))}

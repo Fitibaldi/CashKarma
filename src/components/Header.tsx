@@ -34,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                 <Euro className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900">SplitShare</h1>
+              <h1 className="text-xl font-bold text-gray-900">CashCarma</h1>
             </div>
           </div>
 

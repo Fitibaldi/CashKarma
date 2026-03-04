@@ -77,7 +77,10 @@ export type NotificationType =
   | 'invitation_received'
   | 'invitation_accepted'
   | 'settlement_recorded'
-  | 'member_joined';
+  | 'member_joined'
+  | 'leave_requested'
+  | 'leave_request_approved'
+  | 'leave_request_declined';
 
 export interface Notification {
   id: string;

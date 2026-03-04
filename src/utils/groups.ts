@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase'
 import { Group } from '../data/mockData';
 import { GroupDetails, GroupMember, Payment, Settlement, GroupInvitation } from '../types/group';
 import { User } from '../types/auth';
-import { createNotifications } from './notifications';
+import { createNotification, createNotifications } from './notifications';
 
 // ============================================================
 // INTERNAL: compute member balances from payments + settlements
@@ -92,7 +92,7 @@ export async function getStoredGroups(userId: string): Promise<Group[]> {
 
   // Process groups in parallel instead of sequentially
   const groupPromises = data.map(async (row) => {
-    const g = row.groups as { id: string; name: string; description: string; avatar_url: string | null; location: string; currency: string; created_at: string; is_archived: boolean; created_by: string } | null
+    const g = row.groups as unknown as { id: string; name: string; description: string; avatar_url: string | null; location: string; currency: string; created_at: string; is_archived: boolean; created_by: string } | null
     if (!g) return null
 
     try {
@@ -195,7 +195,7 @@ export async function getStoredGroupDetails(groupId: string): Promise<GroupDetai
     .eq('group_id', groupId)
     .order('created_at', { ascending: false })
 
-  type RawPayment = { id: string; from_user_id: string; from_user_name: string; to_user_id: string | null; amount: number; currency: string; description: string; date: string; method: string; status: string; split_type: string; split_between: string[] | null; paid_by: string; group_id: string; created_at: string; updated_at: string }
+  type RawPayment = { id: string; from_user_id: string; from_user_name: string; to_user_id: string | null; amount: number; currency: string; description: string; date: string; method: string; status: string; split_type: 'equal' | 'specific'; split_between: string[] | null; paid_by: string; group_id: string; created_at: string; updated_at: string }
   const payments: Payment[] = ((paymentRows ?? []) as RawPayment[]).map(p => ({
     id: p.id,
     fromUserId: p.from_user_id,
@@ -269,12 +269,132 @@ export async function createGroupDetails(group: Group, user: User): Promise<void
 // No-op kept for call-site compat — data is in normalised tables now
 export async function saveGroupDetails(_groupId: string, _details: GroupDetails): Promise<void> {}
 
+export async function findPendingInvitationId(userId: string, groupId: string): Promise<string | null> {
+  // No status filter: the upsert that resets status to 'pending' can be blocked by RLS
+  // when the inviter ≠ the invited user. Accept/decline logic handles any existing row.
+  const { data } = await supabase
+    .from('group_invitations')
+    .select('id')
+    .eq('invited_user_id', userId)
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle<{ id: string }>()
+  return data?.id ?? null
+}
+
 export async function archiveGroup(groupId: string): Promise<boolean> {
   const { error } = await supabase
     .from('groups')
     .update({ is_archived: true, updated_at: new Date().toISOString() })
     .eq('id', groupId)
   return !error
+}
+
+export async function requestLeaveGroup(
+  groupId: string,
+  userId: string
+): Promise<'requested' | 'already_pending' | 'error'> {
+  // Check for an existing pending request
+  const { data: existing } = await supabase
+    .from('group_leave_requests')
+    .select('status')
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (existing?.status === 'pending') return 'already_pending'
+
+  const { error: reqError } = await supabase
+    .from('group_leave_requests')
+    .upsert({ group_id: groupId, user_id: userId, status: 'pending' }, { onConflict: 'group_id,user_id' })
+  if (reqError) return 'error'
+
+  const [groupRes, memberRes] = await Promise.all([
+    supabase.from('groups').select('name, created_by').eq('id', groupId).single(),
+    supabase.from('profiles').select('first_name, last_name').eq('id', userId).single(),
+  ])
+  const creatorId = (groupRes.data as { name: string; created_by: string } | null)?.created_by
+  const groupName = (groupRes.data as { name: string } | null)?.name ?? 'your group'
+  const memberName = memberRes.data
+    ? `${memberRes.data.first_name} ${memberRes.data.last_name}`
+    : 'A member'
+
+  if (creatorId && creatorId !== userId) {
+    await createNotification({
+      userId: creatorId,
+      type: 'leave_requested',
+      title: `Leave request in ${groupName}`,
+      body: `${memberName} wants to leave "${groupName}". Approve or decline their request.`,
+      groupId,
+      actorId: userId,
+    })
+  }
+  return 'requested'
+}
+
+export async function approveLeaveRequest(groupId: string, leavingUserId: string): Promise<boolean> {
+  // Remove leaving user from split_between on specific-split payments
+  const { data: specificPayments } = await supabase
+    .from('payments')
+    .select('id, split_between')
+    .eq('group_id', groupId)
+    .eq('split_type', 'specific')
+
+  const paymentsToUpdate = (specificPayments ?? []).filter(
+    p => Array.isArray(p.split_between) && (p.split_between as string[]).includes(leavingUserId)
+  )
+  if (paymentsToUpdate.length > 0) {
+    await Promise.all(
+      paymentsToUpdate.map(p =>
+        supabase
+          .from('payments')
+          .update({ split_between: (p.split_between as string[]).filter(id => id !== leavingUserId) })
+          .eq('id', p.id)
+      )
+    )
+  }
+
+  await supabase
+    .from('group_leave_requests')
+    .update({ status: 'approved' })
+    .eq('group_id', groupId)
+    .eq('user_id', leavingUserId)
+
+  const { error } = await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', leavingUserId)
+
+  if (error) return false
+
+  const { data: groupRow } = await supabase.from('groups').select('name').eq('id', groupId).single()
+  await createNotification({
+    userId: leavingUserId,
+    type: 'leave_request_approved',
+    title: 'Leave request approved',
+    body: `Your request to leave "${groupRow?.name ?? 'the group'}" has been approved.`,
+    groupId,
+  })
+  return true
+}
+
+export async function declineLeaveRequest(groupId: string, leavingUserId: string): Promise<boolean> {
+  await supabase
+    .from('group_leave_requests')
+    .update({ status: 'declined' })
+    .eq('group_id', groupId)
+    .eq('user_id', leavingUserId)
+
+  const { data: groupRow } = await supabase.from('groups').select('name').eq('id', groupId).single()
+  await createNotification({
+    userId: leavingUserId,
+    type: 'leave_request_declined',
+    title: 'Leave request declined',
+    body: `Your request to leave "${groupRow?.name ?? 'the group'}" was declined by the group creator.`,
+    groupId,
+  })
+  return true
 }
 
 export async function leaveGroup(groupId: string, userId: string): Promise<boolean> {
@@ -329,7 +449,7 @@ export async function createGroupInvitations(
   }))
   await supabase
     .from('group_invitations')
-    .upsert(rows, { onConflict: 'group_id,invited_user_id', ignoreDuplicates: true })
+    .upsert(rows, { onConflict: 'group_id,invited_user_id' })
 
   // Notify invited users
   const [groupRes, inviterRes] = await Promise.all([

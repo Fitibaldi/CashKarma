@@ -94,8 +94,8 @@ export const DashboardPage: React.FC = () => {
     if (user) await loadData(user.id);
   };
 
-  const activeGroups = groups.filter(g => !g.isArchived);
-  const archivedGroups = groups.filter(g => g.isArchived);
+  const activeGroups = groups.filter(g => !g.isArchived).sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
+  const archivedGroups = groups.filter(g => g.isArchived).sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
 
   const totalBalance = activeGroups.reduce((sum, group) => sum + group.yourBalance, 0);
   const youOwe = activeGroups.filter(g => g.yourBalance < 0).reduce((sum, g) => sum + Math.abs(g.yourBalance), 0);

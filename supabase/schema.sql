@@ -110,6 +110,18 @@ create table public.invite_codes (
 );
 
 -- ============================================================
+-- TABLE: group_leave_requests
+-- ============================================================
+create table public.group_leave_requests (
+  id         uuid primary key default gen_random_uuid(),
+  group_id   uuid not null references public.groups(id) on delete cascade,
+  user_id    uuid not null references public.profiles(id) on delete cascade,
+  status     text not null default 'pending' check (status in ('pending', 'approved', 'declined')),
+  created_at timestamptz not null default now(),
+  unique(group_id, user_id)
+);
+
+-- ============================================================
 -- TABLE: notifications
 -- ============================================================
 create table public.notifications (
@@ -118,7 +130,8 @@ create table public.notifications (
   type       text not null check (type in (
                'payment_added', 'payment_edited', 'payment_deleted',
                'invitation_received', 'invitation_accepted',
-               'settlement_recorded', 'member_joined'
+               'settlement_recorded', 'member_joined',
+               'leave_requested', 'leave_request_approved', 'leave_request_declined'
              )),
   title      text not null,
   body       text not null,
@@ -191,13 +204,14 @@ create trigger set_payments_updated_at
 -- ============================================================
 -- ENABLE ROW LEVEL SECURITY
 -- ============================================================
-alter table public.profiles          enable row level security;
-alter table public.groups            enable row level security;
-alter table public.group_members     enable row level security;
-alter table public.payments          enable row level security;
-alter table public.settlements       enable row level security;
-alter table public.group_invitations enable row level security;
-alter table public.invite_codes      enable row level security;
+alter table public.profiles              enable row level security;
+alter table public.groups                enable row level security;
+alter table public.group_members         enable row level security;
+alter table public.payments              enable row level security;
+alter table public.settlements           enable row level security;
+alter table public.group_invitations     enable row level security;
+alter table public.invite_codes          enable row level security;
+alter table public.group_leave_requests  enable row level security;
 
 -- ============================================================
 -- HELPER: is_group_member(group_id)
@@ -277,6 +291,16 @@ create policy "group_members: self can leave"
   to authenticated
   using (user_id = auth.uid());
 
+create policy "group_members: creator can remove members"
+  on public.group_members for delete
+  to authenticated
+  using (
+    exists (
+      select 1 from public.groups g
+      where g.id = group_id and g.created_by = auth.uid()
+    )
+  );
+
 -- ============================================================
 -- RLS POLICIES: payments
 -- ============================================================
@@ -341,6 +365,12 @@ create policy "invitations: invited user can update"
   using (invited_user_id = auth.uid())
   with check (invited_user_id = auth.uid());
 
+create policy "invitations: inviter can reset"
+  on public.group_invitations for update
+  to authenticated
+  using (invited_by = auth.uid() and public.is_group_member(group_id))
+  with check (invited_by = auth.uid());
+
 -- ============================================================
 -- RLS POLICIES: invite_codes
 -- ============================================================
@@ -352,6 +382,41 @@ create policy "invite_codes: authenticated can read"
 create policy "invite_codes: creator can insert"
   on public.invite_codes for insert
   to authenticated
+  with check (
+    exists (
+      select 1 from public.groups g
+      where g.id = group_id and g.created_by = auth.uid()
+    )
+  );
+
+-- ============================================================
+-- RLS POLICIES: group_leave_requests
+-- ============================================================
+create policy "leave_requests: member or creator can read"
+  on public.group_leave_requests for select
+  to authenticated
+  using (
+    user_id = auth.uid()
+    or exists (
+      select 1 from public.groups g
+      where g.id = group_id and g.created_by = auth.uid()
+    )
+  );
+
+create policy "leave_requests: member can insert"
+  on public.group_leave_requests for insert
+  to authenticated
+  with check (user_id = auth.uid() and public.is_group_member(group_id));
+
+create policy "leave_requests: creator can update"
+  on public.group_leave_requests for update
+  to authenticated
+  using (
+    exists (
+      select 1 from public.groups g
+      where g.id = group_id and g.created_by = auth.uid()
+    )
+  )
   with check (
     exists (
       select 1 from public.groups g

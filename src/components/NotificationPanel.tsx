@@ -1,7 +1,10 @@
-import React, { useRef, useEffect } from 'react'
-import { Bell, Check, CheckCheck, CreditCard, UserPlus, Users, DollarSign, Pencil, Trash2 } from 'lucide-react'
+import React, { useRef, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Bell, Check, CheckCheck, CreditCard, UserPlus, Users, DollarSign, Pencil, Trash2, X, LogOut } from 'lucide-react'
 import { useNotifications } from '../contexts/NotificationsContext'
+import { useAuth } from '../contexts/AuthContext'
 import { Notification, NotificationType } from '../types/group'
+import { acceptGroupInvitation, declineGroupInvitation, findPendingInvitationId, approveLeaveRequest, declineLeaveRequest } from '../utils/groups'
 
 interface NotificationPanelProps {
   isOpen: boolean
@@ -21,48 +24,122 @@ function timeAgo(dateStr: string): string {
 }
 
 const iconMap: Record<NotificationType, React.ReactNode> = {
-  payment_added:      <CreditCard className="w-4 h-4 text-blue-500" />,
-  payment_edited:     <Pencil className="w-4 h-4 text-yellow-500" />,
-  payment_deleted:    <Trash2 className="w-4 h-4 text-red-500" />,
-  invitation_received:<UserPlus className="w-4 h-4 text-purple-500" />,
-  invitation_accepted:<Check className="w-4 h-4 text-green-500" />,
-  settlement_recorded:<DollarSign className="w-4 h-4 text-emerald-500" />,
-  member_joined:      <Users className="w-4 h-4 text-indigo-500" />,
+  payment_added:          <CreditCard className="w-4 h-4 text-blue-500" />,
+  payment_edited:         <Pencil className="w-4 h-4 text-yellow-500" />,
+  payment_deleted:        <Trash2 className="w-4 h-4 text-red-500" />,
+  invitation_received:    <UserPlus className="w-4 h-4 text-purple-500" />,
+  invitation_accepted:    <Check className="w-4 h-4 text-green-500" />,
+  settlement_recorded:    <DollarSign className="w-4 h-4 text-emerald-500" />,
+  member_joined:          <Users className="w-4 h-4 text-indigo-500" />,
+  leave_requested:        <LogOut className="w-4 h-4 text-orange-500" />,
+  leave_request_approved: <Check className="w-4 h-4 text-green-500" />,
+  leave_request_declined: <X className="w-4 h-4 text-red-500" />,
 }
 
-const NotificationItem: React.FC<{ notification: Notification; onRead: (id: string) => void }> = ({
+// These types navigate to the group when the row is clicked
+const navigatableTypes: NotificationType[] = [
+  'payment_added', 'payment_edited', 'payment_deleted',
+  'invitation_accepted', 'settlement_recorded', 'member_joined',
+  'leave_request_approved', 'leave_request_declined',
+]
+
+interface NotificationItemProps {
+  notification: Notification
+  onRead: (id: string) => void
+  onClick?: () => void
+  onAccept?: () => Promise<void>
+  onDecline?: () => Promise<void>
+}
+
+const NotificationItem: React.FC<NotificationItemProps> = ({
   notification,
   onRead,
-}) => (
-  <button
-    onClick={() => !notification.isRead && onRead(notification.id)}
-    className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0 ${
-      !notification.isRead ? 'bg-blue-50/40' : ''
-    }`}
-  >
-    <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-      {iconMap[notification.type]}
+  onClick,
+  onAccept,
+  onDecline,
+}) => {
+  const [busy, setBusy] = useState(false)
+  const [handled, setHandled] = useState(false)
+  const hasActions = notification.type === 'invitation_received' || notification.type === 'leave_requested'
+  // Hide buttons once acted on or already read
+  const showActions = hasActions && !notification.isRead && !handled && onAccept && onDecline
+
+  const handleClick = () => {
+    if (!notification.isRead) onRead(notification.id)
+    onClick?.()
+  }
+
+  const handleAccept = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!onAccept || busy) return
+    setHandled(true)
+    setBusy(true)
+    await onAccept()
+    setBusy(false)
+  }
+
+  const handleDecline = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!onDecline || busy) return
+    setHandled(true)
+    setBusy(true)
+    await onDecline()
+    setBusy(false)
+  }
+
+  return (
+    <div className={`border-b border-gray-100 last:border-0 ${!notification.isRead ? 'bg-blue-50/40' : ''}`}>
+      <button
+        onClick={handleClick}
+        className={`w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-gray-50 transition-colors ${onClick ? 'cursor-pointer' : 'cursor-default'}`}
+      >
+        <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+          {iconMap[notification.type]}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <p className={`text-sm leading-snug ${!notification.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
+              {notification.title}
+            </p>
+            {!notification.isRead && (
+              <span className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-500 mt-1.5" />
+            )}
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5 leading-snug">{notification.body}</p>
+          <p className="text-xs text-gray-400 mt-1">{timeAgo(notification.createdAt)}</p>
+        </div>
+      </button>
+
+      {showActions && (
+        <div className="px-4 pb-3 flex gap-2 ml-11">
+          <button
+            onClick={handleAccept}
+            disabled={busy}
+            className="flex items-center gap-1 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+          >
+            <Check className="w-3 h-3" />
+            {notification.type === 'leave_requested' ? 'Approve' : 'Accept'}
+          </button>
+          <button
+            onClick={handleDecline}
+            disabled={busy}
+            className="flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg transition-colors disabled:opacity-50"
+          >
+            <X className="w-3 h-3" />
+            Decline
+          </button>
+        </div>
+      )}
     </div>
-    <div className="flex-1 min-w-0">
-      <div className="flex items-start justify-between gap-2">
-        <p className={`text-sm leading-snug ${!notification.isRead ? 'font-semibold text-gray-900' : 'font-medium text-gray-700'}`}>
-          {notification.title}
-        </p>
-        {!notification.isRead && (
-          <span className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-500 mt-1.5" />
-        )}
-      </div>
-      <p className="text-xs text-gray-500 mt-0.5 leading-snug">{notification.body}</p>
-      <p className="text-xs text-gray-400 mt-1">{timeAgo(notification.createdAt)}</p>
-    </div>
-  </button>
-)
+  )
+}
 
 export const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, onClose, anchorRef }) => {
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
+  const { notifications, unreadCount, markAsRead, markAllAsRead, refresh } = useNotifications()
+  const { user } = useAuth()
+  const navigate = useNavigate()
   const panelRef = useRef<HTMLDivElement>(null)
 
-  // Close on outside click
   useEffect(() => {
     if (!isOpen) return
     const handler = (e: MouseEvent) => {
@@ -78,6 +155,51 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, on
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [isOpen, onClose, anchorRef])
+
+  const handleNotificationClick = (n: Notification) => {
+    if (!n.groupId) return
+    if (!n.isRead) markAsRead(n.id)
+    onClose()
+    navigate(`/group/${n.groupId}`)
+  }
+
+  const handleAccept = async (n: Notification) => {
+    if (!n.groupId || !user) return
+    const invId = await findPendingInvitationId(user.id, n.groupId)
+    if (!invId) return
+    const success = await acceptGroupInvitation(invId)
+    if (success) {
+      markAsRead(n.id)
+      refresh()
+      onClose()
+      navigate(`/group/${n.groupId}`)
+    }
+  }
+
+  const handleDecline = async (n: Notification) => {
+    if (!n.groupId || !user) return
+    const invId = await findPendingInvitationId(user.id, n.groupId)
+    if (!invId) return
+    await declineGroupInvitation(invId)
+    markAsRead(n.id)
+    refresh()
+  }
+
+  const handleApproveLeave = async (n: Notification) => {
+    if (!n.groupId || !n.actorId) return
+    const success = await approveLeaveRequest(n.groupId, n.actorId)
+    if (success) {
+      markAsRead(n.id)
+      refresh()
+    }
+  }
+
+  const handleDeclineLeave = async (n: Notification) => {
+    if (!n.groupId || !n.actorId) return
+    await declineLeaveRequest(n.groupId, n.actorId)
+    markAsRead(n.id)
+    refresh()
+  }
 
   if (!isOpen) return null
 
@@ -118,7 +240,22 @@ export const NotificationPanel: React.FC<NotificationPanelProps> = ({ isOpen, on
           </div>
         ) : (
           notifications.map(n => (
-            <NotificationItem key={n.id} notification={n} onRead={markAsRead} />
+            <NotificationItem
+              key={n.id}
+              notification={n}
+              onRead={markAsRead}
+              onClick={navigatableTypes.includes(n.type) && n.groupId ? () => handleNotificationClick(n) : undefined}
+              onAccept={
+                n.type === 'invitation_received' ? () => handleAccept(n) :
+                n.type === 'leave_requested' ? () => handleApproveLeave(n) :
+                undefined
+              }
+              onDecline={
+                n.type === 'invitation_received' ? () => handleDecline(n) :
+                n.type === 'leave_requested' ? () => handleDeclineLeave(n) :
+                undefined
+              }
+            />
           ))
         )}
       </div>

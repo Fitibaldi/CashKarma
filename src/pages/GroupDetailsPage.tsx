@@ -8,7 +8,7 @@ import { DebtSummary } from '../components/DebtSummary';
 import { SettleDebtModal } from '../components/SettleDebtModal';
 import { MembersList } from '../components/MembersList';
 import { PaymentHistory } from '../components/PaymentHistory';
-import { getStoredGroupDetails, createGroupInvitations, addPaymentToGroup, updatePaymentInGroup, addSettlementToGroup, archiveGroup, leaveGroup } from '../utils/groups';
+import { getStoredGroupDetails, createGroupInvitations, addPaymentToGroup, updatePaymentInGroup, addSettlementToGroup, archiveGroup, requestLeaveGroup } from '../utils/groups';
 import { DebtDetail, GroupDetails, Payment, Settlement } from '../types/group';
 import { useAuth } from '../contexts/AuthContext';
 import { optimizeDebts } from '../utils/debtOptimization';
@@ -112,10 +112,12 @@ export const GroupDetailsPage: React.FC = () => {
 
   const handleLeaveGroup = async () => {
     if (!groupId || !user) return;
-    const confirmed = window.confirm('Leave this group? Your share of split payments will be redistributed among the remaining members.');
-    if (!confirmed) return;
-    const success = await leaveGroup(groupId, user.id);
-    if (success) navigate('/');
+    const result = await requestLeaveGroup(groupId, user.id);
+    if (result === 'already_pending') {
+      alert('Your leave request is already pending. The group creator will review it.');
+    } else if (result === 'requested') {
+      alert('Your request has been sent to the group creator for review.');
+    }
   };
 
   // Calculate optimized debts

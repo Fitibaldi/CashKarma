@@ -6,26 +6,44 @@ import { Notification, NotificationType } from '../types/group'
 // ============================================================
 
 export async function getUserNotifications(userId: string): Promise<Notification[]> {
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(50)
+  const [notifResult, memberResult] = await Promise.all([
+    supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(50),
+    supabase
+      .from('group_members')
+      .select('group_id')
+      .eq('user_id', userId),
+  ])
 
-  if (error || !data) return []
+  if (notifResult.error || !notifResult.data) return []
 
-  return data.map(row => ({
-    id: row.id,
-    userId: row.user_id,
-    type: row.type as NotificationType,
-    title: row.title,
-    body: row.body,
-    groupId: row.group_id ?? undefined,
-    actorId: row.actor_id ?? undefined,
-    isRead: row.is_read,
-    createdAt: row.created_at,
-  }))
+  const userGroupIds = new Set((memberResult.data ?? []).map(m => m.group_id as string))
+
+  // Show if: no group context, user is a current member of the group,
+  // or the notification directly targets the user (e.g. invitation_received)
+  const directUserTypes: string[] = ['invitation_received']
+
+  return notifResult.data
+    .filter(row =>
+      !row.group_id ||
+      userGroupIds.has(row.group_id) ||
+      directUserTypes.includes(row.type)
+    )
+    .map(row => ({
+      id: row.id,
+      userId: row.user_id,
+      type: row.type as NotificationType,
+      title: row.title,
+      body: row.body,
+      groupId: row.group_id ?? undefined,
+      actorId: row.actor_id ?? undefined,
+      isRead: row.is_read,
+      createdAt: row.created_at,
+    }))
 }
 
 // ============================================================
