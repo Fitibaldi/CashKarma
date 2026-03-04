@@ -54,6 +54,7 @@ export const DashboardPage: React.FC = () => {
           description: groupData.description,
           location: groupData.location,
           currency: '€',
+          avatarUrl: groupData.emoji || undefined,
         },
         user.id
       );

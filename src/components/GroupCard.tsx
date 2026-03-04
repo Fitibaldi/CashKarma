@@ -50,8 +50,10 @@ export const GroupCard: React.FC<GroupCardProps> = ({
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center space-x-3">
           <div className={`w-12 h-12 rounded-lg flex items-center justify-center text-white font-semibold text-lg flex-shrink-0 ${isArchived ? 'bg-gray-400' : 'bg-gradient-to-br from-blue-500 to-purple-600'}`}>
-            {avatarUrl ? (
+            {avatarUrl && (avatarUrl.startsWith('http') || avatarUrl.startsWith('blob:')) ? (
               <img src={avatarUrl} alt={name} className="w-full h-full rounded-lg object-cover" />
+            ) : avatarUrl && (avatarUrl.codePointAt(0) ?? 0) > 0xFF ? (
+              <span className="text-2xl leading-none">{avatarUrl}</span>
             ) : (
               name.charAt(0).toUpperCase()
             )}

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, MapPin, Users, FileText } from 'lucide-react';
+import { searchEmoji, suggestEmoji } from '../utils/emojiSearch';
 
 interface CreateGroupModalProps {
   isOpen: boolean;
@@ -11,7 +12,10 @@ export interface GroupFormData {
   name: string;
   description: string;
   location?: string;
+  emoji?: string;
 }
+
+const FALLBACK_EMOJIS = ['👥', '🏠', '✈️', '🎉', '💼', '🍕', '🎮', '🏋️', '🌍', '💡'];
 
 export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   isOpen,
@@ -22,9 +26,28 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
     name: '',
     description: '',
     location: '',
+    emoji: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [suggestions, setSuggestions] = useState<string[]>(FALLBACK_EMOJIS.slice(0, 6));
+
+  // Auto-suggest emojis as name changes
+  useEffect(() => {
+    const results = searchEmoji(formData.name, 6);
+    if (results.length > 0) {
+      setSuggestions(results);
+      // Auto-select best match only if user hasn't manually picked one
+      setFormData(prev => {
+        const autoEmoji = suggestEmoji(prev.name) ?? '';
+        // Only auto-update if still matches a previous auto value
+        const wasAuto = !prev.emoji || FALLBACK_EMOJIS.includes(prev.emoji) || results.includes(prev.emoji) || prev.emoji === suggestEmoji(prev.name);
+        return wasAuto ? { ...prev, emoji: autoEmoji } : prev;
+      });
+    } else {
+      setSuggestions(FALLBACK_EMOJIS.slice(0, 6));
+    }
+  }, [formData.name]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,20 +60,10 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       return;
     }
 
-    if (!formData.description.trim()) {
-      setError('Group description is required');
-      setLoading(false);
-      return;
-    }
-
     try {
       await onCreateGroup(formData);
-      // Reset form
-      setFormData({
-        name: '',
-        description: '',
-        location: '',
-      });
+      setFormData({ name: '', description: '', location: '', emoji: '' });
+      setSuggestions(FALLBACK_EMOJIS.slice(0, 6));
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create group');
@@ -60,10 +73,14 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleClose = () => {
+    setFormData({ name: '', description: '', location: '', emoji: '' });
+    setSuggestions(FALLBACK_EMOJIS.slice(0, 6));
+    setError('');
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -73,10 +90,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <h2 className="text-2xl font-bold text-gray-900">Create New Group</h2>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-          >
+          <button onClick={handleClose} className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -87,6 +101,52 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
               {error}
             </div>
           )}
+
+          {/* Emoji icon preview + picker */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Group Icon</label>
+            <div className="flex items-center gap-4">
+              {/* Preview */}
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl flex-shrink-0 select-none">
+                {formData.emoji ? formData.emoji : (
+                  <span className="text-white text-2xl font-bold">
+                    {formData.name.charAt(0).toUpperCase() || '?'}
+                  </span>
+                )}
+              </div>
+              {/* Suggestions */}
+              <div className="flex-1">
+                <p className="text-xs text-gray-500 mb-2">
+                  {searchEmoji(formData.name, 1).length > 0 ? 'Suggested — tap to select:' : 'Choose an emoji:'}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {suggestions.map(emoji => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, emoji: prev.emoji === emoji ? '' : emoji }))}
+                      className={`w-9 h-9 text-xl rounded-lg border-2 flex items-center justify-center transition-all ${
+                        formData.emoji === emoji
+                          ? 'border-blue-500 bg-blue-50 scale-110'
+                          : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                  {formData.emoji && !suggestions.includes(formData.emoji) && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, emoji: '' }))}
+                      className="text-xs text-gray-400 hover:text-gray-600 px-2"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Group Name */}
           <div>
@@ -112,14 +172,13 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           {/* Description */}
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-              Description *
+              Description
             </label>
             <div className="relative">
               <FileText className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
               <textarea
                 id="description"
                 name="description"
-                required
                 value={formData.description}
                 onChange={handleChange}
                 rows={3}
@@ -128,9 +187,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
                 maxLength={200}
               />
             </div>
-            <p className="text-sm text-gray-500 mt-1">
-              {formData.description.length}/200 characters
-            </p>
+            <p className="text-sm text-gray-500 mt-1">{formData.description.length}/200 characters</p>
           </div>
 
           {/* Location */}
@@ -157,7 +214,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
           <div className="flex space-x-4 pt-4">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
             >
               Cancel

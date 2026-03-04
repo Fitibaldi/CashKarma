@@ -64,8 +64,10 @@ export const GroupDetailsHeader: React.FC<GroupDetailsHeaderProps> = ({
               <ArrowLeft className="w-5 h-5" />
             </button>
             <div className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-semibold text-lg sm:text-xl flex-shrink-0">
-              {group.avatarUrl ? (
+              {group.avatarUrl && (group.avatarUrl.startsWith('http') || group.avatarUrl.startsWith('blob:')) ? (
                 <img src={group.avatarUrl} alt={group.name} className="w-full h-full rounded-xl object-cover" />
+              ) : group.avatarUrl && (group.avatarUrl.codePointAt(0) ?? 0) > 0xFF ? (
+                <span className="text-3xl leading-none">{group.avatarUrl}</span>
               ) : (
                 group.name.charAt(0).toUpperCase()
               )}

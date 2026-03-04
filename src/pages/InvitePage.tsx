@@ -154,8 +154,10 @@ export const InvitePage: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full">
         <div className="text-center mb-6">
           <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            {group.avatarUrl ? (
+            {group.avatarUrl && (group.avatarUrl.startsWith('http') || group.avatarUrl.startsWith('blob:')) ? (
               <img src={group.avatarUrl} alt={group.name} className="w-full h-full rounded-2xl object-cover" />
+            ) : group.avatarUrl && (group.avatarUrl.codePointAt(0) ?? 0) > 0xFF ? (
+              <span className="text-3xl leading-none">{group.avatarUrl}</span>
             ) : (
               <Users className="w-8 h-8 text-white" />
             )}
