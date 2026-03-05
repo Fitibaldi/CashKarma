@@ -411,6 +411,57 @@ export async function approveLeaveRequest(groupId: string, leavingUserId: string
   return true
 }
 
+export async function removeGroupMember(groupId: string, removedUserId: string, removedByUserId: string): Promise<boolean> {
+  // Remove user from split_between on specific-split payments (reuse same cleanup as approveLeaveRequest)
+  const { data: specificPayments } = await supabase
+    .from('payments')
+    .select('id, split_between')
+    .eq('group_id', groupId)
+    .eq('split_type', 'specific')
+
+  const paymentsToUpdate = (specificPayments ?? []).filter(
+    p => Array.isArray(p.split_between) && (p.split_between as string[]).includes(removedUserId)
+  )
+  if (paymentsToUpdate.length > 0) {
+    await Promise.all(
+      paymentsToUpdate.map(p =>
+        supabase
+          .from('payments')
+          .update({ split_between: (p.split_between as string[]).filter(id => id !== removedUserId) })
+          .eq('id', p.id)
+      )
+    )
+  }
+
+  const { error } = await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', removedUserId)
+
+  if (error) return false
+
+  const [groupRes, removerRes] = await Promise.all([
+    supabase.from('groups').select('name').eq('id', groupId).single(),
+    supabase.from('profiles').select('first_name, last_name').eq('id', removedByUserId).single(),
+  ])
+  const groupName = groupRes.data?.name ?? 'the group'
+  const removerName = removerRes.data
+    ? `${removerRes.data.first_name} ${removerRes.data.last_name}`
+    : 'The group creator'
+
+  await createNotification({
+    userId: removedUserId,
+    type: 'member_removed',
+    title: `You were removed from "${groupName}"`,
+    body: `${removerName} removed you from the group "${groupName}".`,
+    groupId,
+    actorId: removedByUserId,
+  })
+
+  return true
+}
+
 export async function declineLeaveRequest(groupId: string, leavingUserId: string): Promise<boolean> {
   await supabase
     .from('group_leave_requests')

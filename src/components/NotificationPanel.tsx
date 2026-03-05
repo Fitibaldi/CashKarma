@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Check, CheckCheck, CreditCard, UserPlus, Users, DollarSign, Pencil, Trash2, X, LogOut, Archive } from 'lucide-react'
+import { Bell, Check, CheckCheck, CreditCard, UserPlus, Users, DollarSign, Pencil, Trash2, X, LogOut, Archive, UserMinus } from 'lucide-react'
 import { useNotifications } from '../contexts/NotificationsContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Notification, NotificationType } from '../types/group'
@@ -35,6 +35,7 @@ const iconMap: Record<NotificationType, React.ReactNode> = {
   leave_request_approved: <Check className="w-4 h-4 text-green-500" />,
   leave_request_declined: <X className="w-4 h-4 text-red-500" />,
   group_archived:         <Archive className="w-4 h-4 text-amber-500" />,
+  member_removed:         <UserMinus className="w-4 h-4 text-red-500" />,
 }
 
 // These types navigate to the group when the row is clicked
@@ -63,8 +64,9 @@ const NotificationItem: React.FC<NotificationItemProps> = ({
   const [busy, setBusy] = useState(false)
   const [handled, setHandled] = useState(false)
   const hasActions = notification.type === 'invitation_received' || notification.type === 'leave_requested'
-  // Hide buttons once acted on or already read
-  const showActions = hasActions && !notification.isRead && !handled && onAccept && onDecline
+  // leave_requested buttons always visible (creator may read it and still need to act); others hide once read
+  const showActions = hasActions && !handled && onAccept && onDecline &&
+    (notification.type === 'leave_requested' || !notification.isRead)
 
   const handleClick = () => {
     if (!notification.isRead) onRead(notification.id)

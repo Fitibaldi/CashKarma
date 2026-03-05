@@ -81,7 +81,8 @@ export type NotificationType =
   | 'leave_requested'
   | 'leave_request_approved'
   | 'leave_request_declined'
-  | 'group_archived';
+  | 'group_archived'
+  | 'member_removed';
 
 export interface Notification {
   id: string;

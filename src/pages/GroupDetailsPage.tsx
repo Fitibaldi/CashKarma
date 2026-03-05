@@ -8,7 +8,7 @@ import { DebtSummary } from '../components/DebtSummary';
 import { SettleDebtModal } from '../components/SettleDebtModal';
 import { MembersList } from '../components/MembersList';
 import { PaymentHistory } from '../components/PaymentHistory';
-import { getStoredGroupDetails, createGroupInvitations, addPaymentToGroup, updatePaymentInGroup, addSettlementToGroup, archiveGroup, requestLeaveGroup } from '../utils/groups';
+import { getStoredGroupDetails, createGroupInvitations, addPaymentToGroup, updatePaymentInGroup, addSettlementToGroup, archiveGroup, requestLeaveGroup, removeGroupMember } from '../utils/groups';
 import { DebtDetail, GroupDetails, Payment, Settlement } from '../types/group';
 import { useAuth } from '../contexts/AuthContext';
 import { optimizeDebts } from '../utils/debtOptimization';
@@ -120,6 +120,15 @@ export const GroupDetailsPage: React.FC = () => {
     }
   };
 
+  const handleRemoveMember = async (memberId: string) => {
+    if (!groupId || !user) return;
+    const member = groupDetails.members.find(m => m.id === memberId);
+    if (!member) return;
+    if (!window.confirm(`Remove ${member.firstName} ${member.lastName} from the group?`)) return;
+    await removeGroupMember(groupId, memberId, user.id);
+    await loadDetails();
+  };
+
   // Calculate optimized debts
   const optimizedDebts = optimizeDebts(groupDetails.members, groupDetails.currency);
 
@@ -146,7 +155,13 @@ export const GroupDetailsPage: React.FC = () => {
           />
 
           {/* Members List */}
-          <MembersList members={groupDetails.members} currency={groupDetails.currency} />
+          <MembersList
+            members={groupDetails.members}
+            currency={groupDetails.currency}
+            currentUserId={user?.id}
+            groupCreatorId={groupDetails.createdBy}
+            onRemoveMember={handleRemoveMember}
+          />
 
           {/* Payment History */}
           <PaymentHistory

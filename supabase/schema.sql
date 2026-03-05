@@ -134,7 +134,7 @@ create table public.notifications (
                'invitation_received', 'invitation_accepted',
                'settlement_recorded', 'member_joined',
                'leave_requested', 'leave_request_approved', 'leave_request_declined',
-               'group_archived'
+               'group_archived', 'member_removed'
              )),
   title      text not null,
   body       text not null,

@@ -25,7 +25,7 @@ export async function getUserNotifications(userId: string): Promise<Notification
 
   // Show if: no group context, user is a current member of the group,
   // or the notification directly targets the user (e.g. invitation_received)
-  const directUserTypes: string[] = ['invitation_received']
+  const directUserTypes: string[] = ['invitation_received', 'member_removed']
 
   return notifResult.data
     .filter(row =>
