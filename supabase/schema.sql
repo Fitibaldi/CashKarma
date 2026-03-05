@@ -31,6 +31,7 @@ create table public.groups (
   location     text not null default '',
   currency     text not null default '€',
   is_archived  boolean not null default false,
+  is_deleted   boolean not null default false,
   created_by   uuid not null references public.profiles(id),
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()
@@ -447,3 +448,8 @@ create policy "notifications: user can update own"
   to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+
+-- ============================================================
+-- MIGRATION: add is_deleted to groups (run if table already exists)
+-- alter table public.groups add column if not exists is_deleted boolean not null default false;
+-- ============================================================

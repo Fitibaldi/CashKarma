@@ -1,5 +1,5 @@
-import React from 'react';
-import { Users, DollarSign, Calendar, ChevronRight, Archive, Crown } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Users, DollarSign, Calendar, ChevronRight, Archive, Crown, Trash2, UserPlus, Plus, LogOut } from 'lucide-react';
 
 interface GroupCardProps {
   id: string;
@@ -14,6 +14,11 @@ interface GroupCardProps {
   isArchived?: boolean;
   isOwner?: boolean;
   onClick: (id: string) => void;
+  onArchive?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onInvite?: (id: string) => void;
+  onAddPayment?: (id: string) => void;
+  onLeaveGroup?: (id: string) => void;
 }
 
 export const GroupCard: React.FC<GroupCardProps> = ({
@@ -28,8 +33,26 @@ export const GroupCard: React.FC<GroupCardProps> = ({
   yourBalance,
   isArchived,
   isOwner,
-  onClick
+  onClick,
+  onArchive,
+  onDelete,
+  onInvite,
+  onAddPayment,
+  onLeaveGroup,
 }) => {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const balanceColor = yourBalance > 0
     ? 'text-green-600'
     : yourBalance < 0
@@ -41,6 +64,17 @@ export const GroupCard: React.FC<GroupCardProps> = ({
     : yourBalance < 0
     ? `You owe ${currency}${Math.abs(yourBalance).toFixed(2)}`
     : 'You are settled up';
+
+  const handleMenuClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMenuOpen(prev => !prev);
+  };
+
+  const handleAction = (e: React.MouseEvent, action: () => void) => {
+    e.stopPropagation();
+    setMenuOpen(false);
+    action();
+  };
 
   return (
     <div
@@ -76,7 +110,71 @@ export const GroupCard: React.FC<GroupCardProps> = ({
             <p className="text-gray-500 text-sm">{description}</p>
           </div>
         </div>
-        <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 transition-colors flex-shrink-0" />
+
+        <div className="relative flex-shrink-0" ref={menuRef}>
+          <button
+            onClick={handleMenuClick}
+            className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+            title="Group actions"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+
+          {menuOpen && (
+            <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+              {isArchived ? (
+                onDelete && (
+                  <button
+                    onClick={(e) => handleAction(e, () => onDelete(id))}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete group
+                  </button>
+                )
+              ) : (
+                <>
+                  {onAddPayment && (
+                    <button
+                      onClick={(e) => handleAction(e, () => onAddPayment(id))}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add payment
+                    </button>
+                  )}
+                  {isOwner && onInvite && (
+                    <button
+                      onClick={(e) => handleAction(e, () => onInvite(id))}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      Invite members
+                    </button>
+                  )}
+                  {isOwner && onArchive && (
+                    <button
+                      onClick={(e) => handleAction(e, () => onArchive(id))}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-amber-700 hover:bg-amber-50 rounded-lg transition-colors"
+                    >
+                      <Archive className="w-4 h-4" />
+                      Archive group
+                    </button>
+                  )}
+                  {!isOwner && onLeaveGroup && (
+                    <button
+                      onClick={(e) => handleAction(e, () => onLeaveGroup(id))}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Leave group
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-4">

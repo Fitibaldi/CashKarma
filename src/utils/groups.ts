@@ -85,15 +85,15 @@ function formatGroupDate(isoString: string): string {
 export async function getStoredGroups(userId: string): Promise<Group[]> {
   const { data, error } = await supabase
     .from('group_members')
-    .select('group_id, role, joined_at, groups(id, name, description, avatar_url, location, currency, created_at, is_archived, created_by)')
+    .select('group_id, role, joined_at, groups(id, name, description, avatar_url, location, currency, created_at, is_archived, is_deleted, created_by)')
     .eq('user_id', userId)
 
   if (error || !data) return []
 
   // Process groups in parallel instead of sequentially
   const groupPromises = data.map(async (row) => {
-    const g = row.groups as unknown as { id: string; name: string; description: string; avatar_url: string | null; location: string; currency: string; created_at: string; is_archived: boolean; created_by: string } | null
-    if (!g) return null
+    const g = row.groups as unknown as { id: string; name: string; description: string; avatar_url: string | null; location: string; currency: string; created_at: string; is_archived: boolean; is_deleted: boolean; created_by: string } | null
+    if (!g || g.is_deleted) return null
 
     try {
       // Parallelize all queries for this group
@@ -287,6 +287,14 @@ export async function archiveGroup(groupId: string): Promise<boolean> {
   const { error } = await supabase
     .from('groups')
     .update({ is_archived: true, updated_at: new Date().toISOString() })
+    .eq('id', groupId)
+  return !error
+}
+
+export async function softDeleteGroup(groupId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('groups')
+    .update({ is_deleted: true, updated_at: new Date().toISOString() })
     .eq('id', groupId)
   return !error
 }

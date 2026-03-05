@@ -6,11 +6,13 @@ import { Header } from '../components/Header';
 import { GroupCard } from '../components/GroupCard';
 import { EmptyState } from '../components/EmptyState';
 import { CreateGroupModal, GroupFormData } from '../components/CreateGroupModal';
+import { InviteMembersModal } from '../components/InviteMembersModal';
+import { AddPaymentModal } from '../components/AddPaymentModal';
 import { Group } from '../data/mockData';
 import { useAuth } from '../contexts/AuthContext';
-import { getStoredGroups, saveGroup, createGroupDetails, getUserInvitations, acceptGroupInvitation, declineGroupInvitation, generateInviteCode } from '../utils/groups';
+import { getStoredGroups, saveGroup, createGroupDetails, getUserInvitations, acceptGroupInvitation, declineGroupInvitation, generateInviteCode, archiveGroup, softDeleteGroup, requestLeaveGroup, getStoredGroupDetails, createGroupInvitations, addPaymentToGroup } from '../utils/groups';
 import { GroupInvitationCard } from '../components/GroupInvitationCard';
-import { GroupInvitation } from '../types/group';
+import { GroupDetails, GroupInvitation, Payment } from '../types/group';
 import { UserProfileModal } from '../components/UserProfileModal';
 import { JoinGroupModal } from '../components/JoinGroupModal';
 
@@ -22,6 +24,11 @@ export const DashboardPage: React.FC = () => {
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
   const [invitations, setInvitations] = useState<GroupInvitation[]>([]);
+
+  // Modals opened from group card quick actions
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isAddPaymentModalOpen, setIsAddPaymentModalOpen] = useState(false);
+  const [activeGroupDetails, setActiveGroupDetails] = useState<GroupDetails | null>(null);
 
   const loadData = async (userId: string) => {
     const [allGroups, userInvitations] = await Promise.all([
@@ -95,6 +102,52 @@ export const DashboardPage: React.FC = () => {
     if (user) await loadData(user.id);
   };
 
+  const handleArchiveGroup = async (groupId: string) => {
+    await archiveGroup(groupId);
+    if (user) await loadData(user.id);
+  };
+
+  const handleDeleteGroup = async (groupId: string) => {
+    if (!window.confirm('Delete this group? It will no longer be visible to anyone.')) return;
+    await softDeleteGroup(groupId);
+    if (user) await loadData(user.id);
+  };
+
+  const handleLeaveGroup = async (groupId: string) => {
+    if (!user) return;
+    const result = await requestLeaveGroup(groupId, user.id);
+    if (result === 'already_pending') {
+      alert('Your leave request is already pending. The group creator will review it.');
+    } else if (result === 'requested') {
+      alert('Your request has been sent to the group creator for review.');
+    }
+  };
+
+  const openInviteModal = async (groupId: string) => {
+    const details = await getStoredGroupDetails(groupId);
+    if (!details) return;
+    setActiveGroupDetails(details);
+    setIsInviteModalOpen(true);
+  };
+
+  const openAddPaymentModal = async (groupId: string) => {
+    const details = await getStoredGroupDetails(groupId);
+    if (!details) return;
+    setActiveGroupDetails(details);
+    setIsAddPaymentModalOpen(true);
+  };
+
+  const handleInviteUsers = async (userIds: string[]) => {
+    if (!activeGroupDetails) return;
+    await createGroupInvitations(activeGroupDetails.id, userIds, user?.id || '');
+  };
+
+  const handleSavePayment = async (paymentData: Omit<Payment, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!activeGroupDetails) return;
+    await addPaymentToGroup(activeGroupDetails.id, paymentData);
+    if (user) await loadData(user.id);
+  };
+
   const activeGroups = groups.filter(g => !g.isArchived).sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
   const archivedGroups = groups.filter(g => g.isArchived).sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
 
@@ -110,7 +163,7 @@ export const DashboardPage: React.FC = () => {
         onProfileClick={handleProfileClick}
         user={user}
       />
-      
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Message */}
         <div className="mb-8">
@@ -184,6 +237,10 @@ export const DashboardPage: React.FC = () => {
                 {...group}
                 isOwner={group.createdBy === user?.id}
                 onClick={handleGroupClick}
+                onArchive={group.createdBy === user?.id ? handleArchiveGroup : undefined}
+                onInvite={group.createdBy === user?.id ? openInviteModal : undefined}
+                onAddPayment={openAddPaymentModal}
+                onLeaveGroup={group.createdBy !== user?.id ? handleLeaveGroup : undefined}
               />
             ))}
           </div>
@@ -205,6 +262,7 @@ export const DashboardPage: React.FC = () => {
                   {...group}
                   isOwner={group.createdBy === user?.id}
                   onClick={handleGroupClick}
+                  onDelete={group.createdBy === user?.id ? handleDeleteGroup : undefined}
                 />
               ))}
             </div>
@@ -228,6 +286,29 @@ export const DashboardPage: React.FC = () => {
         onClose={() => setIsJoinModalOpen(false)}
         onJoined={refreshGroups}
       />
+
+      {activeGroupDetails && (
+        <>
+          <InviteMembersModal
+            isOpen={isInviteModalOpen}
+            onClose={() => { setIsInviteModalOpen(false); setActiveGroupDetails(null); }}
+            groupId={activeGroupDetails.id}
+            groupName={activeGroupDetails.name}
+            currentMembers={activeGroupDetails.members.map(m => m.id)}
+            onInviteUsers={handleInviteUsers}
+          />
+
+          <AddPaymentModal
+            isOpen={isAddPaymentModalOpen}
+            onClose={() => { setIsAddPaymentModalOpen(false); setActiveGroupDetails(null); }}
+            groupId={activeGroupDetails.id}
+            members={activeGroupDetails.members}
+            currency={activeGroupDetails.currency}
+            currentUserId={user?.id || ''}
+            onAddPayment={handleSavePayment}
+          />
+        </>
+      )}
     </div>
   );
 };
