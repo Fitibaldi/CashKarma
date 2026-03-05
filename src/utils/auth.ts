@@ -8,6 +8,7 @@ function rowToUser(row: {
   first_name: string
   last_name: string
   avatar_url: string | null
+  currency: string | null
   created_at: string
 }): User {
   return {
@@ -17,6 +18,7 @@ function rowToUser(row: {
     lastName: row.last_name,
     createdAt: row.created_at,
     avatarUrl: row.avatar_url ?? undefined,
+    currency: row.currency ?? undefined,
   }
 }
 
@@ -67,12 +69,13 @@ export async function registerUser(credentials: RegisterCredentials): Promise<Us
 
 export async function updateUserProfile(
   userId: string,
-  data: { firstName?: string; lastName?: string; avatarUrl?: string }
+  data: { firstName?: string; lastName?: string; avatarUrl?: string; currency?: string }
 ): Promise<User | null> {
   const updates: Record<string, string> = {}
   if (data.firstName !== undefined) updates.first_name = data.firstName
   if (data.lastName !== undefined) updates.last_name = data.lastName
   if (data.avatarUrl !== undefined) updates.avatar_url = data.avatarUrl
+  if (data.currency !== undefined) updates.currency = data.currency
 
   const { data: profile, error } = await supabase
     .from('profiles')

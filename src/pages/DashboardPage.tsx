@@ -60,14 +60,14 @@ export const DashboardPage: React.FC = () => {
           name: groupData.name,
           description: groupData.description,
           location: groupData.location,
-          currency: '€',
+          currency: user.currency ?? '€',
           avatarUrl: groupData.emoji || undefined,
         },
         user.id
       );
       console.log('Group created with ID:', groupId);
 
-      await createGroupDetails({ id: groupId, name: groupData.name, description: groupData.description, location: groupData.location, currency: '€', memberCount: 1, totalExpenses: 0, lastActivity: 'Just now', yourBalance: 0 }, user);
+      await createGroupDetails({ id: groupId, name: groupData.name, description: groupData.description, location: groupData.location, currency: user.currency ?? '€', memberCount: 1, totalExpenses: 0, lastActivity: 'Just now', yourBalance: 0 }, user);
       console.log('Group details created');
 
       await generateInviteCode(groupId);

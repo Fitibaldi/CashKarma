@@ -16,6 +16,7 @@ create table public.profiles (
   first_name  text not null,
   last_name   text not null,
   avatar_url  text,
+  currency    text not null default '€',
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
@@ -453,4 +454,9 @@ create policy "notifications: user can update own"
 -- ============================================================
 -- MIGRATION: add is_deleted to groups (run if table already exists)
 -- alter table public.groups add column if not exists is_deleted boolean not null default false;
+-- ============================================================
+
+-- ============================================================
+-- MIGRATION: add currency to profiles (run if table already exists)
+-- alter table public.profiles add column if not exists currency text not null default '€';
 -- ============================================================

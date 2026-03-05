@@ -3,7 +3,7 @@ import { User, LoginCredentials, RegisterCredentials, AuthContextType } from '..
 import { authenticateUser, registerUser, updateUserProfile, signOut } from '../utils/auth'
 import { supabase } from '../lib/supabase'
 
-type ProfileRow = { id: string; email: string; first_name: string; last_name: string; created_at: string; avatar_url: string | null }
+type ProfileRow = { id: string; email: string; first_name: string; last_name: string; created_at: string; avatar_url: string | null; currency: string | null }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -48,6 +48,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 lastName: profile.last_name,
                 createdAt: profile.created_at,
                 avatarUrl: profile.avatar_url ?? undefined,
+                currency: profile.currency ?? undefined,
               })
             }
           } finally {
@@ -78,7 +79,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // onAuthStateChange fires SIGNED_OUT and clears user state
   }
 
-  const updateProfile = async (data: { firstName?: string; lastName?: string; avatarUrl?: string }): Promise<void> => {
+  const updateProfile = async (data: { firstName?: string; lastName?: string; avatarUrl?: string; currency?: string }): Promise<void> => {
     if (!user) return
     const updated = await updateUserProfile(user.id, data)
     if (updated) setUser(updated)

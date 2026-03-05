@@ -5,6 +5,7 @@ export interface User {
   lastName: string;
   createdAt: string;
   avatarUrl?: string;
+  currency?: string;
 }
 
 export interface LoginCredentials {
@@ -30,6 +31,6 @@ export interface AuthContextType {
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (data: { firstName?: string; lastName?: string; avatarUrl?: string }) => Promise<void>;
+  updateProfile: (data: { firstName?: string; lastName?: string; avatarUrl?: string; currency?: string }) => Promise<void>;
   loading: boolean;
 }
