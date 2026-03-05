@@ -30,6 +30,7 @@ export interface AuthContextType {
   user: User | null;
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (data: { firstName?: string; lastName?: string; avatarUrl?: string; currency?: string }) => Promise<void>;
   loading: boolean;
