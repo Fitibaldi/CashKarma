@@ -132,7 +132,8 @@ create table public.notifications (
                'payment_added', 'payment_edited', 'payment_deleted',
                'invitation_received', 'invitation_accepted',
                'settlement_recorded', 'member_joined',
-               'leave_requested', 'leave_request_approved', 'leave_request_declined'
+               'leave_requested', 'leave_request_approved', 'leave_request_declined',
+               'group_archived'
              )),
   title      text not null,
   body       text not null,

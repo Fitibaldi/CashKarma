@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, Check, CheckCheck, CreditCard, UserPlus, Users, DollarSign, Pencil, Trash2, X, LogOut } from 'lucide-react'
+import { Bell, Check, CheckCheck, CreditCard, UserPlus, Users, DollarSign, Pencil, Trash2, X, LogOut, Archive } from 'lucide-react'
 import { useNotifications } from '../contexts/NotificationsContext'
 import { useAuth } from '../contexts/AuthContext'
 import { Notification, NotificationType } from '../types/group'
@@ -34,6 +34,7 @@ const iconMap: Record<NotificationType, React.ReactNode> = {
   leave_requested:        <LogOut className="w-4 h-4 text-orange-500" />,
   leave_request_approved: <Check className="w-4 h-4 text-green-500" />,
   leave_request_declined: <X className="w-4 h-4 text-red-500" />,
+  group_archived:         <Archive className="w-4 h-4 text-amber-500" />,
 }
 
 // These types navigate to the group when the row is clicked
@@ -41,6 +42,7 @@ const navigatableTypes: NotificationType[] = [
   'payment_added', 'payment_edited', 'payment_deleted',
   'invitation_accepted', 'settlement_recorded', 'member_joined',
   'leave_request_approved', 'leave_request_declined',
+  'group_archived',
 ]
 
 interface NotificationItemProps {

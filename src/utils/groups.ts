@@ -288,7 +288,31 @@ export async function archiveGroup(groupId: string): Promise<boolean> {
     .from('groups')
     .update({ is_archived: true, updated_at: new Date().toISOString() })
     .eq('id', groupId)
-  return !error
+  if (error) return false
+
+  const [groupRes, memberRows] = await Promise.all([
+    supabase.from('groups').select('name, created_by').eq('id', groupId).single(),
+    supabase.from('group_members').select('user_id').eq('group_id', groupId),
+  ])
+  const groupName = groupRes.data?.name ?? 'the group'
+  const creatorId = groupRes.data?.created_by
+  const others = (memberRows.data ?? [])
+    .map(r => r.user_id as string)
+    .filter(uid => uid !== creatorId)
+
+  if (others.length > 0) {
+    await createNotifications(
+      others.map(uid => ({
+        userId: uid,
+        type: 'group_archived' as const,
+        title: `"${groupName}" has been archived`,
+        body: `The group "${groupName}" was archived. You can still view its history but no new payments or invitations are allowed.`,
+        groupId,
+        actorId: creatorId ?? undefined,
+      }))
+    )
+  }
+  return true
 }
 
 export async function softDeleteGroup(groupId: string): Promise<boolean> {
