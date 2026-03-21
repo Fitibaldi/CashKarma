@@ -57,6 +57,8 @@ const EMOJI_MAP: Array<{ emoji: string; keywords: string[] }> = [
   { emoji: '🏊', keywords: ['swimming', 'pool', 'swim', 'aquatic'] },
   { emoji: '🎿', keywords: ['ski', 'skiing', 'snowboard', 'winter sport', 'slope'] },
   { emoji: '🏄', keywords: ['surf', 'surfing', 'wave', 'board'] },
+  { emoji: '🥊', keywords: ['boxing', 'fight', 'martial arts', 'mma', 'ufc'] },
+  { emoji: '🎣', keywords: ['fishing', 'fish', 'angling', 'outdoors'] },
 
   // Work & Business
   { emoji: '💼', keywords: ['work', 'business', 'office', 'corporate', 'professional', 'company', 'team'] },

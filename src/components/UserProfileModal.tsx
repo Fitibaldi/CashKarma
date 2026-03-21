@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Camera, Search } from 'lucide-react';
+import { X, Camera, Search, Pencil } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { CURRENCIES, DEFAULT_CURRENCY } from '../utils/currencies';
 
@@ -17,6 +17,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
   const [previewUrl, setPreviewUrl] = useState<string | undefined>(user?.avatarUrl);
   const [currency, setCurrency] = useState(user?.currency ?? DEFAULT_CURRENCY);
   const [currencySearch, setCurrencySearch] = useState('');
+  const [editingCurrency, setEditingCurrency] = useState(false);
   const [saving, setSaving] = useState(false);
 
   if (!isOpen || !user) return null;
@@ -137,42 +138,55 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onCl
               <span className="text-lg font-semibold text-blue-700">{selectedCurrency?.symbol ?? currency}</span>
               <span className="text-sm font-medium text-blue-700">{selectedCurrency?.code ?? ''}</span>
               <span className="text-sm text-blue-500">{selectedCurrency?.name ?? ''}</span>
+              <button
+                type="button"
+                onClick={() => setEditingCurrency(v => !v)}
+                className="ml-auto p-1 text-blue-400 hover:text-blue-600 transition-colors rounded"
+                aria-label="Edit currency"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
             </div>
 
-            {/* Search */}
-            <div className="relative mb-2">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                value={currencySearch}
-                onChange={e => setCurrencySearch(e.target.value)}
-                placeholder="Search by code, name or symbol…"
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+            {editingCurrency && (
+              <>
+                {/* Search */}
+                <div className="relative mb-2">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={currencySearch}
+                    onChange={e => setCurrencySearch(e.target.value)}
+                    placeholder="Search by code, name or symbol…"
+                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    autoFocus
+                  />
+                </div>
 
-            {/* Currency list */}
-            <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
-              {filteredCurrencies.map(c => (
-                <button
-                  key={c.code}
-                  type="button"
-                  onClick={() => setCurrency(c.symbol)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
-                    currency === c.symbol
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'hover:bg-gray-50 text-gray-700'
-                  }`}
-                >
-                  <span className="w-6 text-center font-semibold text-base">{c.symbol}</span>
-                  <span className="font-medium w-10 flex-shrink-0">{c.code}</span>
-                  <span className="text-gray-500 truncate">{c.name}</span>
-                </button>
-              ))}
-              {filteredCurrencies.length === 0 && (
-                <p className="px-3 py-3 text-sm text-gray-400 text-center">No currencies found.</p>
-              )}
-            </div>
+                {/* Currency list */}
+                <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg divide-y divide-gray-100">
+                  {filteredCurrencies.map(c => (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => { setCurrency(c.symbol); setEditingCurrency(false); setCurrencySearch(''); }}
+                      className={`w-full flex items-center gap-3 px-3 py-2 text-left text-sm transition-colors ${
+                        currency === c.symbol
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      <span className="w-6 text-center font-semibold text-base">{c.symbol}</span>
+                      <span className="font-medium w-10 flex-shrink-0">{c.code}</span>
+                      <span className="text-gray-500 truncate">{c.name}</span>
+                    </button>
+                  ))}
+                  {filteredCurrencies.length === 0 && (
+                    <p className="px-3 py-3 text-sm text-gray-400 text-center">No currencies found.</p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
 
